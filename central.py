@@ -298,11 +298,11 @@ class AfiliadosInfo():
     def pontos_por_recarga():
         with open_utf8('settings/credenciais.json', 'r') as f:
             data = json.load(f)
-        return int(data["pontos_by_indicate_buy"])
+        return float(data["pontos_by_indicate_buy"])
     def mudar_pontos_por_recarga(pontos):
         with open_utf8('settings/credenciais.json', 'r') as f:
             data = json.load(f)
-        data["pontos_by_indicate_buy"] = int(pontos)
+        data["pontos_by_indicate_buy"] = float(pontos)
         with open_utf8('settings/credenciais.json', 'w') as f:
             json.dump(data, f, indent=4)
         return
@@ -687,7 +687,9 @@ class MudancaHistorico():
             if AfiliadosInfo.status_afiliado() == True and afiliado_por != 0:
                 indicador_data = load_user_data(afiliado_por)
                 if indicador_data:
-                    indicador_data["pontos_indicado"] += AfiliadosInfo.pontos_por_recarga()
+                    comissao = round(float(valor) * float(AfiliadosInfo.pontos_por_recarga()) / 100, 2)
+                    indicador_data["saldo"] = float(indicador_data.get("saldo", 0)) + comissao
+                    indicador_data["pontos_indicado"] = float(indicador_data.get("pontos_indicado", 0)) + comissao
                     save_user_data(afiliado_por, indicador_data)
 
     def zerar_pontos(id):

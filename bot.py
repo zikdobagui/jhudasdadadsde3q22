@@ -27,6 +27,7 @@ import threading
 import random
 import html
 import zipfile
+import urllib.parse
 import central as api
 import pytz
 from io import BytesIO
@@ -2297,6 +2298,91 @@ def salvar_config_roleta_admin(message, campo):
 def comando_roleta_admin(message):
     mostrar_admin_roleta(message)
 
+def total_comissao_indicacao(user_id):
+    user_data = database.load_user_data(user_id)
+    if not user_data:
+        return 0.0
+    return float(user_data.get("pontos_indicado", 0) or 0)
+
+def pagar_comissao_afiliado(indicado_id, valor_recarga):
+    if not api.AfiliadosInfo.status_afiliado():
+        return 0.0
+
+    indicado = database.load_user_data(indicado_id)
+    if not indicado:
+        return 0.0
+
+    indicador_id = int(indicado.get("afiliado_por") or 0)
+    if not indicador_id or indicador_id == int(indicado_id):
+        return 0.0
+
+    indicador = database.load_user_data(indicador_id)
+    if not indicador:
+        return 0.0
+
+    percentual = float(api.AfiliadosInfo.pontos_por_recarga())
+    if percentual <= 0:
+        return 0.0
+
+    comissao = round(float(valor_recarga) * percentual / 100, 2)
+    if comissao <= 0:
+        return 0.0
+
+    indicador["saldo"] = float(indicador.get("saldo", 0) or 0) + comissao
+    indicador["pontos_indicado"] = float(indicador.get("pontos_indicado", 0) or 0) + comissao
+    database.save_user_data(indicador_id, indicador)
+
+    try:
+        bot.send_message(
+            indicador_id,
+            (
+                "👥 <b>Você ganhou comissão!</b>\n\n"
+                f"Um indicado fez uma recarga de <b>R${float(valor_recarga):.2f}</b>.\n"
+                f"Sua comissão: <b>R${comissao:.2f}</b>\n"
+                "O valor já caiu no seu saldo."
+            ),
+            parse_mode='HTML'
+        )
+    except Exception:
+        pass
+
+    return comissao
+
+def mostrar_indique_ganhe(call):
+    user_id = call.from_user.id
+    link = f"https://t.me/{api.CredentialsChange.user_bot()}?start={user_id}"
+    percentual = api.AfiliadosInfo.pontos_por_recarga()
+    quantidade = api.InfoUser.quantidade_afiliados(user_id)
+    total_ganho = total_comissao_indicacao(user_id)
+
+    texto = (
+        "👥 <b>INDIQUE E GANHE</b>\n\n"
+        f"Compartilhe seu link e ganhe <b>{percentual}%</b> de tudo que seus indicados recarregarem — "
+        "direto no seu saldo, automático! 💰\n\n"
+        "🔗 <b>Seu link de indicação:</b>\n"
+        f"<code>{html.escape(link)}</code>\n\n"
+        f"👤 <b>Seus indicados:</b> {quantidade}\n"
+        f"💵 <b>Total já ganho:</b> R${total_ganho:.2f}\n\n"
+        "<i>Toque no link acima para copiar e mande para os amigos!</i>"
+    )
+    share_url = (
+        "https://t.me/share/url?"
+        f"url={urllib.parse.quote(link, safe='')}"
+        "&text=Entre%20nesse%20bot%20e%20confira%20as%20ofertas!"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('📤 Compartilhar meu link', url=share_url))
+    markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+
+    bot.edit_message_text(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        text=texto,
+        parse_mode='HTML',
+        reply_markup=markup,
+        disable_web_page_preview=True
+    )
+
 def _database_import_destination(zip_name: str):
     clean_name = zip_name.replace('\\', '/').strip('/')
     parts = PurePosixPath(clean_name).parts
@@ -3811,43 +3897,21 @@ def atualizar_mensagem_rank(call, ranking_selecionado):
 
 
 def configurar_afiliados(message):
+    status = "ON" if api.AfiliadosInfo.status_afiliado() else "OFF"
+    percentual = api.AfiliadosInfo.pontos_por_recarga()
     texto = (
-        f'â€¢ <b>PONTOS MINIMO PRA SALDO: {api.AfiliadosInfo.minimo_pontos_pra_saldo()}</b>âš™ï¸\n'
-        f'<b>MULTIPLICADOR: {api.AfiliadosInfo.multiplicador_pontos()}</b>\n\n\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'â€¢ <b>SISTEMA DE INDICAÃ‡ÃƒO</b>\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'Ao clicar, altera o status do sistema de indicaÃ§Ã£o. Se estiver OFF os usuÃ¡rios nÃ£o poderÃ£o trocar seus pontos por saldo.\n'
-        f'VERDE = On\nVERMELHO = Off\n'
-        f'â€¢â€¢â€¢â€¢â€¢â€¢â€¢ðŸ“‹\n\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'â€¢ <b>PONTOS POR RECARGA</b>\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'Essa Ã© a quantidade de pontos que o usuÃ¡rio ganha cada vez que o seu afiliado fizer uma recarga.\n'
-        f'â€¢â€¢â€¢â€¢â€¢â€¢â€¢ðŸ“‹\n\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'â€¢ <b>PONTOS MINIMO PARA CONVERTER</b>\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'Isso Ã© a quantidade mÃ­nima de pontos que o usuÃ¡rio precisa para converter seus pontos em saldo.\n'
-        f'â€¢â€¢â€¢â€¢â€¢â€¢â€¢ðŸ“‹\n\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'âš™ï¸ <b>MULTIPLICADOR PARA CONVERTER</b>\n'
-        f'âœ… â€¢â€¢âš™ï¸ âœ… â€¢â€¢âš™ï¸ âœ…\n'
-        f'Isso Ã© o multiplicador de pontos para saldo na hora de converter.\n'
-        f'<b>EX:</b> <i>Se o multiplicador for 0.01 e o usuÃ¡rio tiver 500 pontos, '
-        f'quando ele converter ele ficarÃ¡ com 5,00 de saldo.\n'
-        f'Se o multiplicador for 0.50 e o usuario tiver com 20 pontos, '
-        f'quando ele converter ele ficarÃ¡ com 10,00 de saldo.</i>\n'
-        f'â€¢â€¢â€¢â€¢â€¢â€¢â€¢ðŸ“‹'
+        f'👥 <b>CONFIGURAR INDICAÇÕES</b>\n\n'
+        f'<b>Status:</b> {status}\n'
+        f'<b>Comissão por recarga:</b> {percentual}%\n\n'
+        f'Quando um cliente entra pelo link de indicação e faz uma recarga, '
+        f'quem indicou recebe essa porcentagem direto no saldo automaticamente.'
     )
-    bt = InlineKeyboardButton('â€¢ SISTEMA DE INDICAÃ‡ÃƒO(off)', callback_data='mudar_status_afiliados')
+    bt = InlineKeyboardButton('Sistema de Indicação: OFF', callback_data='mudar_status_afiliados')
     if api.AfiliadosInfo.status_afiliado() == True:
-        bt = InlineKeyboardButton('â€¢ SISTEMA DE INDICAÃ‡ÃƒO(off)', callback_data='mudar_status_afiliados')
-    bt2 = InlineKeyboardButton('â€¢ PONTOS POR RECARGA', callback_data='pontos_por_recarga')
-    bt3 = InlineKeyboardButton('â€¢ PONTOS MINIMO PARA CONVERTER', callback_data='pontos_minimo_converter')
-    bt4 = InlineKeyboardButton('âš™ï¸ MULTIPLICADOR PARA CONVERTER', callback_data='multiplicador_para_converter')
-    bt5 = InlineKeyboardButton('âœ… VOLTAR', callback_data='voltar_paineladm')
-    markup = InlineKeyboardMarkup([[bt], [bt2], [bt3], [bt4], [bt5]])
+        bt = InlineKeyboardButton('Sistema de Indicação: ON', callback_data='mudar_status_afiliados')
+    bt2 = InlineKeyboardButton('Alterar Comissão %', callback_data='pontos_por_recarga')
+    bt5 = InlineKeyboardButton('VOLTAR', callback_data='voltar_paineladm')
+    markup = InlineKeyboardMarkup([[bt], [bt2], [bt5]])
     bot.edit_message_text(
         chat_id=message.chat.id,
         message_id=message.message_id,
@@ -3858,11 +3922,14 @@ def configurar_afiliados(message):
 
 def pontos_por_recarga(message):
     try:
-        pontos = message.text
+        pontos = float((message.text or '').replace(',', '.'))
+        if pontos < 0 or pontos > 100:
+            bot.reply_to(message, "Envie uma porcentagem entre 0 e 100.")
+            return
         api.AfiliadosInfo.mudar_pontos_por_recarga(pontos)
-        bot.reply_to(message, f"Alterado com sucesso! Agora toda vez que um usuÃ¡rio recarregar, quem indicou ele ganharÃ© {pontos} pontos.")
+        bot.reply_to(message, f"Alterado com sucesso! Agora quem indicar ganha {pontos:.2f}% de cada recarga do indicado direto no saldo.")
     except:
-        bot.reply_to(message, "Falha ao alterar a quantidade de pontos, verifique se enviou um nÃ©mero aceitavel.")
+        bot.reply_to(message, "Falha ao alterar a comissão, verifique se enviou um número aceitável.")
 
 def pontos_minimo_converter(message):
     try:
@@ -4047,6 +4114,7 @@ def gerar_menu_principal():
     bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
+    bt_indique = InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_comprar)
@@ -4057,6 +4125,8 @@ def gerar_menu_principal():
     markup.row(bt_estoque, bt_grupo_telegram)
     markup.row(bt_alugar, bt_grupo_whatsapp)
     markup.row(bt_carrinho, bt_notificar)
+    if api.AfiliadosInfo.status_afiliado() == True:
+        markup.add(bt_indique)
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
@@ -5191,11 +5261,6 @@ def handle_start(message):
         ver_se_expirou()
         return
 
-    if len(message.text.split()) == 2:
-        referral_id = message.text.split()[1]
-        if referral_id.isdigit() and referral_id != str(message.from_user.id):
-            api.InfoUser.novo_afiliado(message.from_user.id, referral_id)
-
     if not api.InfoUser.verificar_usuario(message.from_user.id):
         api.InfoUser.novo_usuario(message.from_user.id)
         try:
@@ -5206,6 +5271,11 @@ def handle_start(message):
             )
         except Exception as e:
             bot.send_message(api.CredentialsChange.id_dono(), f"Log nÃ£o enviada!\nMotivo: {e}")
+
+    if len(message.text.split()) == 2:
+        referral_id = message.text.split()[1]
+        if referral_id.isdigit() and referral_id != str(message.from_user.id):
+            api.InfoUser.novo_afiliado(message.from_user.id, referral_id)
 
     if api.InfoUser.verificar_ban(message.from_user.id):
         bot.reply_to(message, "â€¢ VocÃª estÃ© banido deste bot e nÃ£o pode utilizÃ©-lo!")
@@ -5269,9 +5339,6 @@ def perfil(message):
     markup = InlineKeyboardMarkup()
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {message.chat.id}')
     markup.add(bt)
-    if api.AfiliadosInfo.status_afiliado() == True:
-        bt2 = InlineKeyboardButton(f'{api.Botoes.trocar_pontos_por_saldo()}', callback_data=f'trocar_pontos')
-        markup.add(bt2)
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(message)
@@ -6354,12 +6421,14 @@ def verificar_pagamento(chat_id: int, id_pag: str, valor: float, message_id: int
             before = get_user_balance(chat_id)
             add_saldo(chat_id, saldo_deposito)
             add_pagamento(chat_id, valor, id_pag)
+            comissao_afiliado = pagar_comissao_afiliado(chat_id, valor)
             after = get_user_balance(chat_id)
             print(f"[verificar_pagamento] Saldo de {chat_id} atualizado: {before} -> {after}")
             texto_user = (
                 f"<b>âœ… PAGAMENTO APROVADO!</b>\n\n"
                 f"â€¢ Valor depositado: R${valor:.2f}\n"
                 f"âœ… BÃ©nus: R${(saldo_deposito - valor):.2f}\n"
+                f"👥 Comissão afiliado: R${comissao_afiliado:.2f}\n"
                 f"â€¢ Saldo antes: R${before:.2f}\n"
                 f"â€¢ Saldo atual: R${after:.2f}\n"
                 f"â€¢ ID do pagamento: {id_pag}"
@@ -6384,6 +6453,7 @@ def verificar_pagamento(chat_id: int, id_pag: str, valor: float, message_id: int
                 f"â€¢ UsuÃ©rio: `{usuario_tag}`\n"
                 f"â€¢ Valor: `R${valor:.2f}`\n"
                 f"âœ… BÃ©nus: `R${(saldo_deposito - valor):.2f}`\n"
+                f"👥 Comissão afiliado: `R${comissao_afiliado:.2f}`\n"
                 f"â€¢ Saldo antes: `R${before:.2f}`\n"
                 f"â€¢ Saldo depois: `R${after:.2f}`\n"
                 f"â€¢ Data/Hora: `{now}`"
@@ -7990,6 +8060,11 @@ def callback_query(call):
     if call.data == 'roleta_girar':
         girar_roleta(call)
         return
+
+    if call.data == 'indique_ganhe':
+        mostrar_indique_ganhe(call)
+        bot.answer_callback_query(call.id)
+        return
         
     if call.data == 'ver_termos':
         bot.send_message(call.message.chat.id, termos_texto, parse_mode='HTML')
@@ -8156,25 +8231,12 @@ def callback_query(call):
 
     # =============== Menu perfil
     if call.data == 'trocar_pontos':
-        if api.AfiliadosInfo.status_afiliado() == True:
-            if int(api.InfoUser.pontos_indicacao(call.message.chat.id)) >= int(api.AfiliadosInfo.minimo_pontos_pra_saldo()):
-                somar = float(api.InfoUser.pontos_indicacao(call.message.chat.id)) * float(api.AfiliadosInfo.multiplicador_pontos())
-                pts = int(api.InfoUser.pontos_indicacao(call.message.chat.id))
-                api.MudancaHistorico.zerar_pontos(call.message.chat.id)
-                api.InfoUser.add_saldo(call.message.chat.id, float(somar))
-                bot.answer_callback_query(
-                    call.id,
-                    f"Troca concluida!\nVocÃª trocou seus {pts} pontos e obteve um saldo de R${somar:.2f}",
-                    show_alert=True
-                )
-                return
-            else:
-                necessario = int(api.AfiliadosInfo.minimo_pontos_pra_saldo()) - api.InfoUser.pontos_indicacao(call.message.chat.id)
-                bot.answer_callback_query(
-                    call.id,
-                    f"Pontos insuficientes!\nVocÃª precisa de mais {necessario} pontos para converter.",
-                    show_alert=True
-                )
+        bot.answer_callback_query(
+            call.id,
+            "Agora a comissão de indicação cai direto no saldo, automaticamente.",
+            show_alert=True
+        )
+        return
     if call.data == 'menu_start':
         handle_start(call.message)
     if call.data == 'alugarbot':
@@ -8780,6 +8842,7 @@ def gerar_pix_por_comando(message: Message):
                                 bonus_amt = valor * bonus_pct / 100 if valor >= min_bonus else 0.0
                                 add_saldo(chat_id, valor + bonus_amt)
                                 add_pagamento(chat_id, valor, 'pushinpay')
+                                pagar_comissao_afiliado(chat_id, valor)
                                 bot.send_message(chat_id, f'âœ… Pagamento aprovado! Saldo adicionado: R${valor:.2f}' + (f' (+BÃ©nus R${bonus_amt:.2f})' if bonus_amt else ''))
                                 try:
                                     chat_info = bot.get_chat(chat_id)
