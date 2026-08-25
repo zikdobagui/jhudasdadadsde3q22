@@ -1,12 +1,17 @@
 import os
+import json
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
 REMOTE = os.getenv("AUTO_GIT_REMOTE", "origin")
 BRANCH = os.getenv("AUTO_GIT_BRANCH", "main")
+UPDATE_NOTIFY_FILE = ROOT / ".last_update_notify"
 
 
 def run_git(*args: str) -> subprocess.CompletedProcess:
@@ -21,6 +26,106 @@ def run_git(*args: str) -> subprocess.CompletedProcess:
 
 def log(message: str) -> None:
     print(f"[auto-update] {message}", flush=True)
+
+
+def read_json(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def get_short_commit(commit_hash: str) -> str:
+    if not commit_hash:
+        return "desconhecido"
+    return commit_hash[:7]
+
+
+def get_commit_subject(commit_ref: str) -> str:
+    result = run_git("log", "-1", "--pretty=%s", commit_ref)
+    if result.returncode != 0:
+        return "Sem detalhes do commit"
+    return result.stdout.strip() or "Sem detalhes do commit"
+
+
+def get_admin_chat_ids() -> list[int]:
+    chat_ids = set()
+
+    credentials_path = ROOT / "settings" / "credenciais.json"
+    if credentials_path.exists():
+        credentials = read_json(credentials_path)
+        owner_id = credentials.get("id_dono")
+        if owner_id:
+            chat_ids.add(int(owner_id))
+
+    admins_path = ROOT / "database" / "admins.json"
+    if admins_path.exists():
+        admins = read_json(admins_path).get("admins", [])
+        for admin in admins:
+            admin_id = admin.get("id")
+            if admin_id:
+                chat_ids.add(int(admin_id))
+
+    return sorted(chat_ids)
+
+
+def get_bot_token() -> str | None:
+    credentials_path = ROOT / "settings" / "credenciais.json"
+    if not credentials_path.exists():
+        return None
+    return str(read_json(credentials_path).get("api-bot") or "").strip() or None
+
+
+def send_telegram_message(token: str, chat_id: int, text: str) -> bool:
+    data = urllib.parse.urlencode(
+        {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": "true",
+        }
+    ).encode("utf-8")
+
+    request = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=data,
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return 200 <= response.status < 300
+    except Exception as exc:
+        log(f"Falha ao notificar admin {chat_id}: {exc}")
+        return False
+
+
+def notify_admins_updated(old_commit: str, new_commit: str) -> None:
+    token = get_bot_token()
+    chat_ids = get_admin_chat_ids()
+    if not token or not chat_ids:
+        log("Nao encontrei token ou admin para notificar sobre a atualizacao.")
+        return
+
+    notify_key = f"{old_commit}>{new_commit}"
+    if UPDATE_NOTIFY_FILE.exists() and UPDATE_NOTIFY_FILE.read_text(encoding="utf-8").strip() == notify_key:
+        return
+
+    subject = get_commit_subject(new_commit)
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    text = (
+        "<b>Bot atualizado com sucesso!</b>\n\n"
+        f"<b>Repositorio:</b> {REMOTE}/{BRANCH}\n"
+        f"<b>Antes:</b> <code>{get_short_commit(old_commit)}</code>\n"
+        f"<b>Agora:</b> <code>{get_short_commit(new_commit)}</code>\n"
+        f"<b>Commit:</b> {subject}\n"
+        f"<b>Horario:</b> {now}"
+    )
+
+    sent_any = False
+    for chat_id in chat_ids:
+        sent_any = send_telegram_message(token, chat_id, text) or sent_any
+
+    if sent_any:
+        UPDATE_NOTIFY_FILE.write_text(notify_key, encoding="utf-8")
 
 
 def has_git_repo() -> bool:
@@ -65,12 +170,16 @@ def update() -> bool:
         log("Ja esta atualizado.")
         return False
 
+    old_commit = local.stdout.strip()
+    new_commit = upstream.stdout.strip()
+
     pull = run_git("pull", "--ff-only", REMOTE, BRANCH)
     if pull.returncode != 0:
         log(f"Falha no git pull:\n{pull.stdout.strip()}")
         return False
 
     log("Atualizacao aplicada com sucesso.")
+    notify_admins_updated(old_commit, new_commit)
     return True
 
 
