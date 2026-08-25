@@ -1,10 +1,19 @@
 import subprocess
+import sys
+
+
+def auto_update():
+    try:
+        subprocess.run([sys.executable, 'auto_update.py'], check=False)
+    except Exception as exc:
+        print(f"Falha ao executar auto-update: {exc}")
 
 def start_scripts():
  
     try:
+        auto_update()
         
-        bot_process = subprocess.Popen(['python', 'bot.py'])
+        bot_process = subprocess.Popen([sys.executable, 'bot.py'])
         print("Bot principal iniciado.")
 
         # DESABILITADO: Bot gerenciador causa conflito (Error 409) por usar o mesmo token
@@ -13,7 +22,7 @@ def start_scripts():
         # print("Bot gerenciador iniciado.")
 
         
-        update_process = subprocess.Popen(['python', 'update_usernames.py'])
+        update_process = subprocess.Popen([sys.executable, 'update_usernames.py'])
         print("Script de atualização de usernames iniciado.")
 
         
