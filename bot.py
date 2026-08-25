@@ -26,10 +26,12 @@ import subprocess
 import threading
 import random
 import html
+import zipfile
 import central as api
 import pytz
 from io import BytesIO
 from os import system
+from pathlib import PurePosixPath
 from telebot import types
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 from datetime import timezone
@@ -2031,6 +2033,140 @@ def configuracoes_geral(message):
 def _admin_only(message_or_call) -> bool:
     chat_id = message_or_call.chat.id if hasattr(message_or_call, 'chat') else message_or_call.message.chat.id
     return api.Admin.verificar_admin(chat_id) or int(chat_id) == int(api.CredentialsChange.id_dono())
+
+def _database_import_destination(zip_name: str):
+    clean_name = zip_name.replace('\\', '/').strip('/')
+    parts = PurePosixPath(clean_name).parts
+
+    if not parts or any(part in ('', '.', '..') for part in parts):
+        return None
+    if any(part.lower() == '.git' for part in parts):
+        return None
+
+    if 'database' in parts:
+        start = parts.index('database')
+        allowed_parts = parts[start:]
+    elif 'historicos' in parts:
+        start = parts.index('historicos')
+        allowed_parts = parts[start:]
+    elif parts[0] == 'users':
+        allowed_parts = ('database', *parts)
+    elif len(parts) == 1 and parts[0].lower().endswith(('.json', '.txt', '.sync_hash')):
+        allowed_parts = ('database', *parts)
+    else:
+        return None
+
+    if allowed_parts[0] not in ('database', 'historicos'):
+        return None
+
+    return os.path.join(*allowed_parts)
+
+def _safe_import_database_zip(zip_bytes: bytes):
+    imported = 0
+    skipped = 0
+    total_size = 0
+    max_files = 20000
+    max_total_size = 250 * 1024 * 1024
+
+    with zipfile.ZipFile(BytesIO(zip_bytes)) as archive:
+        files = [info for info in archive.infolist() if not info.is_dir()]
+        if len(files) > max_files:
+            raise ValueError(f"Zip tem arquivos demais ({len(files)}). Limite: {max_files}.")
+
+        planned = []
+        for info in files:
+            total_size += info.file_size
+            if total_size > max_total_size:
+                raise ValueError("Zip muito grande para importar com seguranca.")
+
+            destination = _database_import_destination(info.filename)
+            if not destination:
+                skipped += 1
+                continue
+            planned.append((info, destination))
+
+        if not planned:
+            raise ValueError("Nao encontrei arquivos de database/historicos dentro do zip.")
+
+        backup_path = backup_manager.create_backup()
+
+        for info, destination in planned:
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            with archive.open(info) as source, open(destination, 'wb') as target:
+                target.write(source.read())
+            imported += 1
+
+    return imported, skipped, backup_path
+
+def pedir_importar_database(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissao.')
+        return
+
+    msg = bot.send_message(
+        message.chat.id,
+        (
+            "<b>Importar database</b>\n\n"
+            "Envie agora um arquivo <code>.zip</code> contendo a pasta "
+            "<code>database</code> e, se tiver, <code>historicos</code>.\n\n"
+            "Eu vou criar um backup antes de importar."
+        ),
+        parse_mode='HTML',
+        reply_markup=types.ForceReply()
+    )
+    bot.register_next_step_handler(msg, receber_database_zip)
+
+def receber_database_zip(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissao.')
+        return
+
+    document = getattr(message, 'document', None)
+    if not document:
+        bot.reply_to(message, "Envie o database como arquivo .zip.")
+        return
+
+    filename = document.file_name or ''
+    if not filename.lower().endswith('.zip'):
+        bot.reply_to(message, "Arquivo invalido. Envie um .zip.")
+        return
+
+    status_msg = bot.reply_to(message, "Recebi o zip. Baixando e importando com seguranca...")
+
+    try:
+        file_info = bot.get_file(document.file_id)
+        file_bytes = bot.download_file(file_info.file_path)
+        imported, skipped, backup_path = _safe_import_database_zip(file_bytes)
+
+        backup_text = backup_path if backup_path else "backup nao criado"
+        bot.edit_message_text(
+            chat_id=status_msg.chat.id,
+            message_id=status_msg.message_id,
+            text=(
+                "<b>Database importado com sucesso!</b>\n\n"
+                f"<b>Arquivos importados:</b> {imported}\n"
+                f"<b>Arquivos ignorados:</b> {skipped}\n"
+                f"<b>Backup anterior:</b> <code>{html.escape(str(backup_text))}</code>"
+            ),
+            parse_mode='HTML'
+        )
+    except zipfile.BadZipFile:
+        bot.edit_message_text(
+            chat_id=status_msg.chat.id,
+            message_id=status_msg.message_id,
+            text="Nao consegui abrir esse arquivo. Confirme se ele e um .zip valido."
+        )
+    except Exception as e:
+        bot.edit_message_text(
+            chat_id=status_msg.chat.id,
+            message_id=status_msg.message_id,
+            text=f"Erro ao importar database: {html.escape(str(e))}",
+            parse_mode='HTML'
+        )
+
+@bot.message_handler(commands=['importar_database'])
+def comando_importar_database(message):
+    pedir_importar_database(message)
 
 def _utf16_index_to_py_index(text: str, utf16_index: int) -> int:
     total = 0
@@ -7028,6 +7164,7 @@ def callback_query(call):
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton('â€¢ Criar Backup Agora', callback_data='criar_backup'))
         markup.row(InlineKeyboardButton('â€¢ Ver Backups', callback_data='listar_backups'))
+        markup.row(InlineKeyboardButton('â€¢ Importar Database ZIP', callback_data='importar_database_zip'))
         
         if status['auto_backup_enabled']:
             markup.row(InlineKeyboardButton('âœ… Desativar Auto-Backup', callback_data='desativar_auto_backup'))
@@ -7049,6 +7186,15 @@ def callback_query(call):
             bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
         
         bot.answer_callback_query(call.id)
+        return
+
+    if call.data == 'importar_database_zip':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+
+        bot.answer_callback_query(call.id)
+        pedir_importar_database(call.message)
         return
     
     # Criar backup manual
