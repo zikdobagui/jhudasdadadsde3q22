@@ -2349,6 +2349,22 @@ def pagar_comissao_afiliado(indicado_id, valor_recarga):
     return comissao
 
 def mostrar_indique_ganhe(call):
+    if not api.AfiliadosInfo.status_afiliado():
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=(
+                "👥 <b>INDIQUE E GANHE</b>\n\n"
+                "O sistema de indicações está desativado no momento.\n"
+                "Um administrador pode ativar em /admin."
+            ),
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+        return
+
     user_id = call.from_user.id
     link = f"https://t.me/{api.CredentialsChange.user_bot()}?start={user_id}"
     percentual = api.AfiliadosInfo.pontos_por_recarga()
@@ -4125,8 +4141,7 @@ def gerar_menu_principal():
     markup.row(bt_estoque, bt_grupo_telegram)
     markup.row(bt_alugar, bt_grupo_whatsapp)
     markup.row(bt_carrinho, bt_notificar)
-    if api.AfiliadosInfo.status_afiliado() == True:
-        markup.add(bt_indique)
+    markup.add(bt_indique)
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
@@ -5339,6 +5354,7 @@ def perfil(message):
     markup = InlineKeyboardMarkup()
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {message.chat.id}')
     markup.add(bt)
+    markup.add(InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(message)
