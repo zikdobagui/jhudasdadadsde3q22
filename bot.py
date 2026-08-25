@@ -1436,6 +1436,7 @@ def painel_admin(message):
         markup.row(InlineKeyboardButton(f'{button_icon} Editar Botoes', callback_data='editar_botoes'))
         markup.row(InlineKeyboardButton(f'{clipboard} Gerenciar Descricoes', callback_data='gerenciar_descricoes'))
         markup.row(InlineKeyboardButton(f'{soccer}{movie} Jogos e Filmes', callback_data='gerenciar_jogos_filmes'))
+        markup.row(InlineKeyboardButton('🎰 Configurar Roleta', callback_data='admin_roleta'))
         markup.row(InlineKeyboardButton(f'{chart} Consultar Vendas', callback_data='menu_vendas'))
         markup.row(InlineKeyboardButton(f'{floppy} Gerenciar Backups', callback_data='menu_backups'))
         markup.row(InlineKeyboardButton(f'{megaphone} Transmitir a Todos', callback_data='configurar_usuarios'))
@@ -2033,6 +2034,226 @@ def configuracoes_geral(message):
 def _admin_only(message_or_call) -> bool:
     chat_id = message_or_call.chat.id if hasattr(message_or_call, 'chat') else message_or_call.message.chat.id
     return api.Admin.verificar_admin(chat_id) or int(chat_id) == int(api.CredentialsChange.id_dono())
+
+ROLETA_CONFIG_PATH = 'settings/roleta.json'
+ROLETA_GIROS_PATH = 'database/roleta_giros.json'
+
+def _read_json_file(path, default):
+    try:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return default.copy() if isinstance(default, dict) else default
+
+def _write_json_file(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def roleta_default_config():
+    return {
+        "status": "off",
+        "valor_min": 0.1,
+        "valor_max": 2.0,
+        "chance_ganhar": 30
+    }
+
+def carregar_config_roleta():
+    config = roleta_default_config()
+    saved = _read_json_file(ROLETA_CONFIG_PATH, config)
+    config.update(saved)
+    try:
+        config["valor_min"] = max(0.01, float(config.get("valor_min", 0.1)))
+        config["valor_max"] = max(config["valor_min"], float(config.get("valor_max", 2.0)))
+        config["chance_ganhar"] = min(100, max(0, float(config.get("chance_ganhar", 30))))
+    except Exception:
+        config = roleta_default_config()
+    return config
+
+def salvar_config_roleta(config):
+    _write_json_file(ROLETA_CONFIG_PATH, config)
+
+def roleta_ativa():
+    return carregar_config_roleta().get("status") == "on"
+
+def roleta_hoje():
+    return datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')
+
+def carregar_giros_roleta():
+    return _read_json_file(ROLETA_GIROS_PATH, {})
+
+def salvar_giros_roleta(giros):
+    _write_json_file(ROLETA_GIROS_PATH, giros)
+
+def mostrar_roleta(call):
+    config = carregar_config_roleta()
+    markup = InlineKeyboardMarkup()
+    if config.get("status") == "on":
+        markup.row(InlineKeyboardButton('🎰 GIRAR ROLETA', callback_data='roleta_girar'))
+    markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+
+    if config.get("status") != "on":
+        texto = (
+            "🎰 <b>ROLETA DA SORTE</b>\n\n"
+            "A roleta está desativada no momento.\n"
+            "Volte mais tarde para testar sua sorte."
+        )
+    else:
+        texto = (
+            "🎰 <b>ROLETA DA SORTE</b>\n\n"
+            "Gire 1x por dia e concorra a saldo grátis!\n\n"
+            f"Prêmios de <b>R${config['valor_min']:.2f}</b> até "
+            f"<b>R${config['valor_max']:.2f}</b>.\n"
+            "Toque em girar e boa sorte! 🍀"
+        )
+
+    bot.edit_message_text(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        text=texto,
+        parse_mode='HTML',
+        reply_markup=markup
+    )
+
+def girar_roleta(call):
+    config = carregar_config_roleta()
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+
+    if config.get("status") != "on":
+        bot.answer_callback_query(call.id, "A roleta está desativada.", show_alert=True)
+        mostrar_roleta(call)
+        return
+
+    giros = carregar_giros_roleta()
+    user_key = str(user_id)
+    hoje = roleta_hoje()
+    if giros.get(user_key, {}).get("data") == hoje:
+        bot.answer_callback_query(call.id, "Você já girou hoje. Volte amanhã!", show_alert=True)
+        return
+
+    if database.load_user_data(user_id) is None:
+        username = getattr(call.from_user, 'username', None)
+        database.initialize_user(user_id, username)
+
+    ganhou = random.uniform(0, 100) <= float(config["chance_ganhar"])
+    premio = 0.0
+    if ganhou:
+        premio = round(random.uniform(float(config["valor_min"]), float(config["valor_max"])), 2)
+        database.update_user_balance(user_id, premio)
+
+    giros[user_key] = {
+        "data": hoje,
+        "ganhou": ganhou,
+        "valor": premio,
+        "hora": datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
+    }
+    salvar_giros_roleta(giros)
+
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+
+    if ganhou:
+        texto = (
+            "🎰 <b>ROLETA DA SORTE!</b>\n\n"
+            f"🎉 Você ganhou <b>R${premio:.2f}</b> de saldo grátis!\n"
+            "💵 Já caiu na sua conta. Volte amanhã pra girar de novo! 🍀"
+        )
+    else:
+        texto = (
+            "🎰 <b>ROLETA DA SORTE!</b>\n\n"
+            "Não foi dessa vez.\n"
+            "Volte amanhã para tentar novamente! 🍀"
+        )
+
+    bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=call.message.message_id,
+        text=texto,
+        parse_mode='HTML',
+        reply_markup=markup
+    )
+    bot.answer_callback_query(call.id)
+
+def mostrar_admin_roleta(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissão.')
+        return
+
+    config = carregar_config_roleta()
+    status_txt = "Ativada" if config.get("status") == "on" else "Desativada"
+    texto = (
+        "🎰 <b>CONFIGURAR ROLETA DA SORTE</b>\n\n"
+        f"<b>Status:</b> {status_txt}\n"
+        f"<b>Valor mínimo:</b> R${config['valor_min']:.2f}\n"
+        f"<b>Valor máximo:</b> R${config['valor_max']:.2f}\n"
+        f"<b>Chance de ganhar:</b> {config['chance_ganhar']:.0f}%"
+    )
+    markup = InlineKeyboardMarkup()
+    if config.get("status") == "on":
+        markup.row(InlineKeyboardButton('Desativar Roleta', callback_data='roleta_admin_toggle'))
+    else:
+        markup.row(InlineKeyboardButton('Ativar Roleta', callback_data='roleta_admin_toggle'))
+    markup.row(InlineKeyboardButton('Valor Mínimo', callback_data='roleta_admin_min'),
+               InlineKeyboardButton('Valor Máximo', callback_data='roleta_admin_max'))
+    markup.row(InlineKeyboardButton('Chance %', callback_data='roleta_admin_chance'))
+    markup.row(InlineKeyboardButton('Voltar', callback_data='voltar_paineladm'))
+
+    try:
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def pedir_config_roleta(message, campo, titulo):
+    msg = bot.send_message(
+        message.chat.id,
+        f"Envie o novo valor para <b>{titulo}</b>.\nUse apenas número. Exemplo: <code>2.50</code>",
+        parse_mode='HTML',
+        reply_markup=types.ForceReply()
+    )
+    bot.register_next_step_handler(msg, salvar_config_roleta_admin, campo)
+
+def salvar_config_roleta_admin(message, campo):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissão.')
+        return
+    try:
+        valor = float((message.text or '').replace(',', '.').strip())
+    except Exception:
+        bot.reply_to(message, "Valor inválido. Envie apenas número.")
+        return
+
+    config = carregar_config_roleta()
+    if campo == 'chance_ganhar':
+        if valor < 0 or valor > 100:
+            bot.reply_to(message, "A chance precisa ser entre 0 e 100.")
+            return
+        config[campo] = valor
+    elif campo == 'valor_min':
+        if valor <= 0 or valor > config["valor_max"]:
+            bot.reply_to(message, "O valor mínimo precisa ser maior que 0 e menor ou igual ao máximo.")
+            return
+        config[campo] = round(valor, 2)
+    elif campo == 'valor_max':
+        if valor < config["valor_min"]:
+            bot.reply_to(message, "O valor máximo precisa ser maior ou igual ao mínimo.")
+            return
+        config[campo] = round(valor, 2)
+
+    salvar_config_roleta(config)
+    bot.reply_to(message, "Configuração da roleta atualizada com sucesso.")
+
+@bot.message_handler(commands=['roleta_admin'])
+def comando_roleta_admin(message):
+    mostrar_admin_roleta(message)
 
 def _database_import_destination(zip_name: str):
     clean_name = zip_name.replace('\\', '/').strip('/')
@@ -3783,6 +4004,7 @@ def gerar_menu_principal():
     bt_carrinho = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('carrinho', 'CARRINHO'), callback_data='ver_carrinho'), 'carrinho')
     bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
+    bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_comprar)
@@ -3793,6 +4015,8 @@ def gerar_menu_principal():
     markup.row(bt_estoque, bt_grupo_telegram)
     markup.row(bt_alugar, bt_grupo_whatsapp)
     markup.row(bt_carrinho, bt_notificar)
+    if roleta_ativa():
+        markup.add(bt_roleta)
     markup.add(bt_pesquisar)
 
     return markup
@@ -7196,6 +7420,49 @@ def callback_query(call):
         bot.answer_callback_query(call.id)
         pedir_importar_database(call.message)
         return
+
+    if call.data == 'admin_roleta':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_roleta(call.message)
+        return
+
+    if call.data == 'roleta_admin_toggle':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        config = carregar_config_roleta()
+        config["status"] = "off" if config.get("status") == "on" else "on"
+        salvar_config_roleta(config)
+        bot.answer_callback_query(call.id, "Status da roleta atualizado.", show_alert=True)
+        mostrar_admin_roleta(call.message)
+        return
+
+    if call.data == 'roleta_admin_min':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        pedir_config_roleta(call.message, 'valor_min', 'valor mínimo')
+        return
+
+    if call.data == 'roleta_admin_max':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        pedir_config_roleta(call.message, 'valor_max', 'valor máximo')
+        return
+
+    if call.data == 'roleta_admin_chance':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        pedir_config_roleta(call.message, 'chance_ganhar', 'chance de ganhar em %')
+        return
     
     # Criar backup manual
     if call.data == 'criar_backup':
@@ -7652,6 +7919,15 @@ def callback_query(call):
             parse_mode='HTML',
             reply_markup=markup
         )
+        return
+
+    if call.data == 'roleta_sorte':
+        mostrar_roleta(call)
+        bot.answer_callback_query(call.id)
+        return
+
+    if call.data == 'roleta_girar':
+        girar_roleta(call)
         return
         
     if call.data == 'ver_termos':
