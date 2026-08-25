@@ -13,8 +13,8 @@ const toast = document.querySelector('#toast');
 
 tg?.ready();
 tg?.expand();
-tg?.setHeaderColor?.('#f6f8f7');
-tg?.setBackgroundColor?.('#f6f8f7');
+tg?.setHeaderColor?.('#080b10');
+tg?.setBackgroundColor?.('#080b10');
 
 function category(name) {
   const value = name.toLocaleLowerCase('pt-BR');
@@ -139,7 +139,11 @@ checkout.addEventListener('click', () => {
   const items = [...state.cart.entries()].map(([servico, quantidade]) => ({ servico, quantidade }));
   if (!items.length) return;
   const payload = JSON.stringify({ action: 'miniapp_cart', items });
-  if (!tg?.initData) return showToast('Abra esta loja pelo botão dentro do Telegram');
+  if (!tg?.initData || typeof tg.sendData !== 'function') {
+    return showToast('Abra pelo botão ABRIR LOJA AGORA no Telegram');
+  }
+  checkout.disabled = true;
+  checkout.textContent = 'Enviando para o bot...';
   tg.sendData(payload);
   tg.HapticFeedback?.notificationOccurred('success');
   window.setTimeout(() => tg.close(), 350);
