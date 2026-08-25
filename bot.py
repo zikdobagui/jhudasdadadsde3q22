@@ -4148,6 +4148,50 @@ def gerar_menu_principal():
 
     return markup
 
+def markup_inatividade_cliente():
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton('👨‍💼 Suporte', url=api.CredentialsChange.SuporteInfo.link_suporte()),
+        InlineKeyboardButton('🛒 Comprar Agora', callback_data='servicos')
+    )
+    markup.row(
+        InlineKeyboardButton('🛒 Carrinho', callback_data='ver_carrinho'),
+        InlineKeyboardButton('👀 Termos', callback_data='termos_inatividade')
+    )
+    return markup
+
+def texto_inatividade_cliente():
+    return (
+        "👋 <b>Olá! Vi que você ainda não realizou nenhuma compra.</b>\n\n"
+        "Posso te ajudar? Escolha uma das opções abaixo 👇\n\n"
+        "🔔 Para receber novidades e lançamentos, use: /alertas"
+    )
+
+def enviar_aviso_inatividade_cliente(chat_id):
+    return bot.send_message(
+        chat_id,
+        texto_inatividade_cliente(),
+        parse_mode='HTML',
+        reply_markup=markup_inatividade_cliente()
+    )
+
+@bot.message_handler(commands=['avisar_inativo'])
+def comando_avisar_inativo(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissão.')
+        return
+
+    partes = message.text.split(maxsplit=1)
+    if len(partes) != 2 or not partes[1].strip().lstrip('-').isdigit():
+        bot.reply_to(message, "Use assim: /avisar_inativo ID_DO_CLIENTE")
+        return
+
+    try:
+        enviar_aviso_inatividade_cliente(int(partes[1].strip()))
+        bot.reply_to(message, "Aviso de inatividade enviado.")
+    except Exception as e:
+        bot.reply_to(message, f"Erro ao enviar aviso: {e}")
+
 def addsaldo(message):
     markup = InlineKeyboardMarkup()
     # Descobre o gateway selecionado
@@ -8084,6 +8128,30 @@ def callback_query(call):
         
     if call.data == 'ver_termos':
         bot.send_message(call.message.chat.id, termos_texto, parse_mode='HTML')
+
+    if call.data == 'termos_inatividade':
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='voltar_inatividade'))
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=termos_texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+        bot.answer_callback_query(call.id)
+        return
+
+    if call.data == 'voltar_inatividade':
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=texto_inatividade_cliente(),
+            parse_mode='HTML',
+            reply_markup=markup_inatividade_cliente()
+        )
+        bot.answer_callback_query(call.id)
+        return
     
     if call.data == 'jogos_hoje':
         texto_jogos = jf_final.formatar_jogos_telegram()
