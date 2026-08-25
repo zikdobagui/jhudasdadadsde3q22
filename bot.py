@@ -1376,6 +1376,7 @@ def handle_cancelar(message):
 
 @bot.message_handler(commands=['admin'])
 def painel_admin(message):
+    blocked = chr(0x1F6AB)
 
     if api.Admin.verificar_admin(message.chat.id) or int(message.chat.id) == int(api.CredentialsChange.id_dono()):
         gear = chr(0x2699) + chr(0xFE0F)
@@ -1400,7 +1401,6 @@ def painel_admin(message):
         floppy = chr(0x1F4BE)
         back = chr(0x1F519)
         check = chr(0x2705)
-        blocked = chr(0x1F6AB)
 
         if api.Admin.tempo_ate_o_vencimento() <= 0:
             vencimento = f"{warning} <b>SEU BOT ESTA VENCIDO!</b> {warning}"
