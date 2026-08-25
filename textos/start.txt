@@ -1,0 +1,18 @@
+<a href="https://ibb.co/y1DXC0c"> </a><b>SEJAM BEM-VINDOS</b>
+
+
+🍿 𝘊𝘰𝘮𝘱𝘳𝘦 𝘴𝘵𝘳𝘦𝘢𝘮𝘪𝘯𝘨𝘴 𝘥𝘦 𝘧𝘰𝘳𝘮𝘢 𝘢𝘶𝘵𝘰𝘮𝘢́𝘵𝘪𝘤𝘢
+💠 𝘈𝘥𝘪𝘤̧𝘰̃𝘦𝘴 𝘥𝘦 𝘴𝘢𝘭𝘥𝘰 𝘳𝘢́𝘱𝘪𝘥𝘰 𝘦 𝘴𝘦𝘨𝘶𝘳𝘰
+
+Antes de adicionar saldo, garanta que o que deseja comprar esteja disponível! ✅
+
+❌ Lembre-se: Não realizamos reembolsos. Portanto, escolha com cuidado! ⚠️
+
+𝙑𝙊𝘾𝙀 𝘼𝙄𝙉𝘿𝘼 𝙀𝙎𝙏𝘼 𝙀𝙎𝙋𝙀𝙍𝘼𝙉𝘿𝙊 𝙋𝘼𝙍𝘼 𝘾𝙊𝙈𝙋𝙍𝘼𝙍 𝙉𝙊 𝙈𝙀𝙇𝙃𝙊𝙍 𝘽𝙊𝙏 𝘿𝙊 𝙏𝙀𝙇𝙀𝙂𝙍𝘼𝙈?? 
+
+🧾 <b>Seu perfil:</b>
+├👤 <b>NOME:</b> {first_name}
+├👤 <b>USERNAME:</b> {username}
+├🆔️ <b>ID:</b> <code>{id}</code>
+├💸 <b>Saldo:</b> R${saldo}
+└🥇 <b>Pontos de indicação:</b> {pontos_indicacao}

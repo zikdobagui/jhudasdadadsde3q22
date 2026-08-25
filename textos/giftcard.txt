@@ -1,0 +1,3 @@
+{quantidade} GIFT CARD GERADOS!
+
+/resgatar {codigo}

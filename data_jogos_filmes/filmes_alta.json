@@ -1,0 +1,57 @@
+{
+  "data_atualizacao": "09/04/2026 20:42",
+  "filmes": [
+    {
+      "titulo": "Oppenheimer",
+      "ano": "2023",
+      "nota": 8.5,
+      "genero": "Drama, História",
+      "sinopse": "A história do físico J. Robert Oppenheimer e seu papel no desenvolvimento da bomba atômica.",
+      "plataformas": [
+        "Prime Video",
+        "Apple TV"
+      ]
+    },
+    {
+      "titulo": "Barbie",
+      "ano": "2023",
+      "nota": 7.8,
+      "genero": "Comédia, Fantasia",
+      "sinopse": "Barbie e Ken vivem no colorido e aparentemente perfeito mundo da Barbie Land.",
+      "plataformas": [
+        "HBO Max"
+      ]
+    },
+    {
+      "titulo": "Duna: Parte 2",
+      "ano": "2024",
+      "nota": 8.9,
+      "genero": "Ficção Científica",
+      "sinopse": "Paul Atreides une forças com Chani e os Fremen enquanto busca vingança.",
+      "plataformas": [
+        "HBO Max",
+        "Prime Video"
+      ]
+    },
+    {
+      "titulo": "Pobres Criaturas",
+      "ano": "2023",
+      "nota": 8.2,
+      "genero": "Drama, Comédia",
+      "sinopse": "Uma jovem mulher é trazida de volta à vida por um cientista brilhante e pouco ortodoxo.",
+      "plataformas": [
+        "Disney+"
+      ]
+    },
+    {
+      "titulo": "Sociedade da Neve",
+      "ano": "2023",
+      "nota": 7.9,
+      "genero": "Drama, Suspense",
+      "sinopse": "A história real dos sobreviventes do acidente aéreo nos Andes em 1972.",
+      "plataformas": [
+        "Netflix"
+      ]
+    }
+  ]
+}

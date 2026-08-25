@@ -1,0 +1,28 @@
+🪪 <b>𝗦𝗨𝗔𝗦 𝗜𝗡𝗙𝗢𝗥𝗠𝗔𝗖̧𝗢̃𝗘𝗦</b>  
+
+<i>🔍 Aqui você pode visualizar todos os detalhes da sua conta.</i>  
+
+━━━━━━━━━━━━━━━━━━━  
+
+🏦 **𝗖𝗔𝗥𝗧𝗘𝗜𝗥𝗔**  
+💳| <b>Banco:</b>  
+🆔| <b>ID da Carteira:</b> <code>{id}</code>  
+🪙| <b>Saldo disponível:</b> <code>R${saldo}</code>  
+
+━━━━━━━━━━━━━━━━━━━  
+
+🏆 **𝗜𝗡𝗗𝗜𝗖𝗔𝗖̧𝗔̃𝗢**  
+🥇| <b>Pontos acumulados:</b> <code>{pontos_indicacao}</code>  
+👤| <b>Pessoas indicadas:</b> <code>{quantidade_afiliados}</code>  
+🔗| <b>Link de indicação:</b> {link_afiliado}  
+
+━━━━━━━━━━━━━━━━━━━  
+
+🛍️ **𝗛𝗜𝗦𝗧𝗢́𝗥𝗜𝗖𝗢 𝗗𝗘 𝗖𝗢𝗠𝗣𝗥𝗔𝗦**  
+🛒| <b>Logins adquiridos:</b> <code>{quantidade_compras}</code>  
+💠| <b>Saldo adicionado:</b> <code>R${pix_inseridos}</code>  
+• | <b>Gifts resgatados:</b> <code>R${gifts_resgatados}</code>  
+
+━━━━━━━━━━━━━━━━━━━  
+
+✅ **Mantenha-se sempre atualizado!** 🚀  

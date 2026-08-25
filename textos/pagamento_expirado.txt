@@ -1,0 +1,5 @@
+⭕ <b>PAGAMENTO EXPIRADO</b>
+
+
+🆔 <b>Id do pagamento:</b> {id_pagamento}
+<i>Gere outro para recarregar!</i>

@@ -1,0 +1,18 @@
+🥳 <b>🎉 PARABÉNS, SUA COMPRA FOI CONFIRMADA! 🎉</b> 🥳  
+
+📦 <b>• Produto:</b> <b><code>{nome}</code></b>  
+💳 <b>• Valor:</b> <b>R$<code>{valor}</code>,00</b>  
+🏦 <b>• Saldo Atual:</b> <b>R$<code>{saldo}</code></b>  
+
+━━━━━━━━━━━━━━━━━━━  
+
+🔓 <b>✅ ACESSO AO PRODUTO:</b>  
+📧 <b>┌ Email:</b> <b><code>{email}</code></b>  
+🔑 <b>└ Senha:</b> <b><code>{senha}</code></b>  
+
+🗓️ <b>• Data da Compra:</b> <b><code>{data_sem_horario}</code></b>  
+📆 <b>• Expiração em 30 Dias:</b> <b><code>{data_vencimento}</code></b>  
+
+━━━━━━━━━━━━━━━━━━━  
+ℹ️ **📢 INFORMAÇÕES IMPORTANTES:**  
+{descricao}  

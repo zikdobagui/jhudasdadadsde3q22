@@ -1,0 +1,26 @@
+{
+  "data_atualizacao": "09/04/2026 20:42",
+  "jogos": [
+    {
+      "time_casa": "Flamengo",
+      "time_fora": "Palmeiras",
+      "horario": "16:00",
+      "campeonato": "Brasileirão Série A",
+      "canal": "Premiere"
+    },
+    {
+      "time_casa": "Corinthians",
+      "time_fora": "São Paulo",
+      "horario": "18:30",
+      "campeonato": "Brasileirão Série A",
+      "canal": "Globo"
+    },
+    {
+      "time_casa": "Real Madrid",
+      "time_fora": "Barcelona",
+      "horario": "17:00",
+      "campeonato": "La Liga",
+      "canal": "ESPN"
+    }
+  ]
+}

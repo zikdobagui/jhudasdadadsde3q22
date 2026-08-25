@@ -1,0 +1,21 @@
+Prévia atual:
+<a href="https://iili.io/3CvPAFf.gif"> </a><b>🛍️ 𝗙𝗜𝗡𝗔𝗟𝗜𝗭𝗔𝗥 𝗖𝗢𝗠𝗣𝗥𝗔 🛍️</b>
+
+🖥️|• <b>𝐒𝐄𝐑𝐕𝐈Ç𝐎: {nome_servico}</b>
+
+💰|• <b>𝐏𝐑𝐄Ç𝐎:</b> R${valor}
+🪙|• <b>𝐒𝐀𝐋𝐃𝐎 𝐃𝐈𝐒𝐏𝐎𝐍𝐈́𝐕𝐄𝐋:</b> R${saldo}
+📦|• <b>𝐃𝐈𝐒𝐏𝐎𝐍𝐈́𝐕𝐄𝐋:</b> {estoque}
+
+<tg-emoji emoji-id="5316825511337408327">📄</tg-emoji> <b>Descrição:</b>
+{descricao}
+
+<tg-emoji emoji-id="5274055917766202507">🗓</tg-emoji>|• <b>Duração:</b> {duracao}
+
+<tg-emoji emoji-id="5210952531676504517">❌</tg-emoji> Sem reembolso em Pix
+Se houver problema, devolvemos em saldo no bot.
+
+<tg-emoji emoji-id="5307746710682869587">🆘</tg-emoji> Suporte completo
+Equipe online durante todo o período do acesso.
+
+𝐁𝐨𝐚𝐬 𝐜𝐨𝐦𝐩𝐫𝐚𝐬 𝐞 𝐨𝐛𝐫𝐢𝐠𝐚𝐝𝐨 𝐩𝐞𝐥𝐚 𝐩𝐫𝐞𝐟𝐞𝐫𝐞̂𝐧𝐜𝐢𝐚!

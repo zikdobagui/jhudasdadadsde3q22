@@ -1,0 +1,6 @@
+<b>🥳 𝗣𝗔𝗚𝗔𝗠𝗘𝗡𝗧𝗢 𝗖𝗢𝗡𝗙𝗜𝗥𝗠𝗔𝗗𝗢!</b>
+
+<b>├💰 𝙑𝘼𝙇𝙊𝙍 𝘿𝙀𝙋𝙊𝙎𝙄𝙏𝗔𝗗𝗢:</b> R${saldo}  
+<b>└🆔 𝙄𝘿 𝘿𝙊 𝙋𝘼𝙂𝘼𝙈𝙀𝙉𝙏𝗢:</b> {id_pagamento}  
+
+✅ Seu saldo já está disponível para uso. Aproveite! 🚀  
