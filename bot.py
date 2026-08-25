@@ -978,6 +978,14 @@ def fix_mojibake_text(text):
             break
         fixed = decoded
 
+    # Emojis e acentos corretos podem impedir a conversao da frase inteira.
+    # Nesse caso, recupera apenas as palavras que ainda estao corrompidas.
+    fixed = re.sub(
+        r'\S+',
+        lambda match: _decode_mojibake_once(match.group(0)),
+        fixed
+    )
+
     for broken, replacement in MOJIBAKE_REPLACEMENTS.items():
         fixed = fixed.replace(broken, replacement)
     return fixed
@@ -1125,6 +1133,64 @@ bot.send_document = _safe_bot_send_document
 bot.edit_message_text = _safe_bot_edit_message_text
 bot.edit_message_caption = _safe_bot_edit_message_caption
 bot.answer_callback_query = _safe_bot_answer_callback_query
+
+def notificar_versao_atual_aos_admins():
+    try:
+        commit_result = subprocess.run(
+            ['git', 'rev-parse', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=10
+        )
+        if commit_result.returncode != 0:
+            return
+
+        commit = commit_result.stdout.strip()
+        marcador = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.last_admin_update_commit')
+        if os.path.exists(marcador):
+            with open(marcador, 'r', encoding='utf-8') as arquivo:
+                if arquivo.read().strip() == commit:
+                    return
+
+        subject_result = subprocess.run(
+            ['git', 'log', '-1', '--pretty=%s'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=10
+        )
+        assunto = subject_result.stdout.strip() if subject_result.returncode == 0 else 'Sem detalhes'
+        admin_ids = {int(api.CredentialsChange.id_dono())}
+        admins_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database', 'admins.json')
+        if os.path.exists(admins_path):
+            with open(admins_path, 'r', encoding='utf-8') as arquivo:
+                admins = json.load(arquivo).get('admins', [])
+            admin_ids.update(int(admin['id']) for admin in admins if admin.get('id'))
+        texto = (
+            '<b>Bot atualizado e iniciado com sucesso!</b>\n\n'
+            f'<b>Versão:</b> <code>{commit[:7]}</code>\n'
+            f'<b>Novidades:</b> {html.escape(assunto)}\n'
+            f'<b>Horário:</b> {datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")}'
+        )
+
+        enviado = False
+        for admin_id in admin_ids:
+            try:
+                bot.send_message(admin_id, texto, parse_mode='HTML')
+                enviado = True
+            except Exception as error:
+                print(f'Falha ao avisar atualização ao admin {admin_id}: {error}', flush=True)
+
+        if enviado:
+            with open(marcador, 'w', encoding='utf-8') as arquivo:
+                arquivo.write(commit)
+    except Exception as error:
+        print(f'Falha ao verificar aviso da versão atual: {error}', flush=True)
+
+notificar_versao_atual_aos_admins()
 
 try:
     bot.send_message(

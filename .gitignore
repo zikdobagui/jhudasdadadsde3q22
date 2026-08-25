@@ -10,6 +10,7 @@ log/
 .last_update_notify
 settings/credenciais.json
 settings/button_overrides.json
+.last_admin_update_commit
 
 backups/
 historicos/
