@@ -1551,18 +1551,18 @@ def painel_admin(message):
                    InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
         markup.row(InlineKeyboardButton(f'{handshake} Configurar Afiliados', callback_data='configurar_afiliados'),
                    InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
-        markup.row(InlineKeyboardButton(f'{megaphone} Notificacoes Fake', callback_data='configurar_notificacoes_fake'),
-                   InlineKeyboardButton(f'{check} Gift Card', callback_data='gift_card'))
-        markup.row(InlineKeyboardButton('📣 Destinos Reais', callback_data='config_destinos_reais'))
+        markup.row(InlineKeyboardButton(f'{megaphone} Notificacoes Fake', callback_data='configurar_notificacoes_fake'))
         markup.row(InlineKeyboardButton(f'{memo} Editar Textos', callback_data='editar_textos'),
                    InlineKeyboardButton(f'{image_icon} Gerenciar Imagens', callback_data='gerenciar_imagens'))
         markup.row(InlineKeyboardButton(f'{card} Configurar Pagamentos', callback_data='configurar_pagamentos'))
-        markup.row(InlineKeyboardButton(f'{button_icon} Editar Botoes', callback_data='editar_botoes'))
+        markup.row(InlineKeyboardButton('📣 Destinos Reais', callback_data='config_destinos_reais'),
+                   InlineKeyboardButton(f'{button_icon} Editar Botoes', callback_data='editar_botoes'))
         markup.row(InlineKeyboardButton(f'{clipboard} Gerenciar Descricoes', callback_data='gerenciar_descricoes'))
         markup.row(InlineKeyboardButton(f'{soccer}{movie} Jogos e Filmes', callback_data='gerenciar_jogos_filmes'))
-        markup.row(InlineKeyboardButton('🎰 Configurar Roleta', callback_data='admin_roleta'))
-        markup.row(InlineKeyboardButton(f'{chart} Consultar Vendas', callback_data='menu_vendas'))
-        markup.row(InlineKeyboardButton(f'{floppy} Gerenciar Backups', callback_data='menu_backups'))
+        markup.row(InlineKeyboardButton('🎰 Configurar Roleta', callback_data='admin_roleta'),
+                   InlineKeyboardButton(f'{check} Gift Card', callback_data='gift_card'))
+        markup.row(InlineKeyboardButton(f'{chart} Consultar Vendas', callback_data='menu_vendas'),
+                   InlineKeyboardButton(f'{floppy} Gerenciar Backups', callback_data='menu_backups'))
         markup.row(InlineKeyboardButton(f'{megaphone} Transmitir a Todos', callback_data='configurar_usuarios'))
         markup.row(InlineKeyboardButton(f'{back} Voltar', callback_data='voltar_menu'))
 
