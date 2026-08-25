@@ -1250,19 +1250,25 @@ class Textos():
         return texto
 
     def perfil(message):
-        first_name = message.chat.first_name
-        username = message.chat.username
-        id = message.chat.id
-        link_afiliado = f'https://t.me/{CredentialsChange.user_bot()}?start={message.chat.id}'
+        first_name = message.first_name or ''
+        last_name = message.last_name or ''
+        full_name = ' '.join(part for part in (first_name, last_name) if part).strip()
+        username = f'@{message.username}' if message.username else 'Não informado'
+        id = message.id
         saldo = InfoUser.saldo(id)
-        pontos_indicacao = InfoUser.pontos_indicacao(id)
-        quantidade_afiliados = InfoUser.quantidade_afiliados(id)
         quantidade_compras = InfoUser.total_compras(id)
         pix_inseridos = f'{InfoUser.pix_inseridos(id):.2f}'
         gifts_resgatados = f'{InfoUser.gifts_resgatados(id):.2f}'
         with open_utf8('textos/perfil.txt', 'r') as f:
             texto = f.read()
-        texto = texto.replace('{first_name}', f'{first_name}').replace('{username}', f'@{username}').replace('{id}', f'{id}').replace('{link_afiliado}', f'{link_afiliado}').replace('{saldo}', f'{saldo:.2f}').replace('{pontos_indicacao}', f'{pontos_indicacao}').replace('{quantidade_afiliados}', f'{quantidade_afiliados}').replace('{quantidade_compras}', f'{quantidade_compras}').replace('{pix_inseridos}', f'{pix_inseridos}').replace('{gifts_resgatados}', f'{gifts_resgatados}')
+        texto = texto.replace('{first_name}', html.escape(first_name)) \
+                    .replace('{full_name}', html.escape(full_name or 'Não informado')) \
+                    .replace('{username}', html.escape(username)) \
+                    .replace('{id}', f'{id}') \
+                    .replace('{saldo}', f'{saldo:.2f}') \
+                    .replace('{quantidade_compras}', f'{quantidade_compras}') \
+                    .replace('{pix_inseridos}', f'{pix_inseridos}') \
+                    .replace('{gifts_resgatados}', f'{gifts_resgatados}')
         return texto
     def adicionar_saldo(message):
         first_name = message.chat.first_name

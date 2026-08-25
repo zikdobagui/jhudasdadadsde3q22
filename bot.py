@@ -1016,6 +1016,8 @@ def _ignore_expired_callback_query(error):
 
 def _safe_bot_edit_message_text(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'text')
+    if args:
+        args = (fix_mojibake_text(args[0]), *args[1:])
     try:
         return _original_bot_edit_message_text(*args, **kwargs)
     except ApiTelegramException as error:
@@ -1025,6 +1027,8 @@ def _safe_bot_edit_message_text(*args, **kwargs):
 
 def _safe_bot_edit_message_caption(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'caption')
+    if args:
+        args = (fix_mojibake_text(args[0]), *args[1:])
     try:
         return _original_bot_edit_message_caption(*args, **kwargs)
     except ApiTelegramException as error:
@@ -1056,6 +1060,8 @@ def _safe_bot_send_document(*args, **kwargs):
 
 def _safe_bot_answer_callback_query(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'text')
+    if len(args) >= 2:
+        args = (args[0], fix_mojibake_text(args[1]), *args[2:])
     try:
         return _original_bot_answer_callback_query(*args, **kwargs)
     except ApiTelegramException as error:
@@ -5515,21 +5521,42 @@ def handle_start(message):
         reply_markup=markup
     )
 
-def perfil(message):
+def perfil(call):
+    message = call.message
+    user = call.from_user
     markup = InlineKeyboardMarkup()
-    bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {message.chat.id}')
+    bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
-    markup.add(InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
-    texto = api.Textos.perfil(message)
-    bot.edit_message_text(
-        chat_id=message.chat.id,
-        message_id=message.message_id,
-        text=texto,
-        parse_mode='HTML',
-        reply_markup=markup
-    )
+    texto = api.Textos.perfil(user)
+
+    try:
+        fotos = bot.get_user_profile_photos(user.id, limit=1)
+        foto = fotos.photos[0][-1].file_id if fotos.total_count and fotos.photos else None
+    except Exception:
+        foto = None
+
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except ApiTelegramException:
+        pass
+
+    if foto:
+        bot.send_photo(
+            chat_id=message.chat.id,
+            photo=foto,
+            caption=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    else:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
 
 def enviar_menu_inicial(message):
     texto = decorate_start_text(message)   
@@ -5544,6 +5571,10 @@ def enviar_menu_inicial(message):
 
 @bot.callback_query_handler(func=lambda c: c.data == 'menu_start')
 def callback_menu_start(call):
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except ApiTelegramException:
+        pass
     enviar_menu_inicial(call.message)
 
 
@@ -8371,7 +8402,7 @@ def callback_query(call):
 
     # =============== Menu inicial
     if call.data == 'perfil':
-        perfil(call.message)
+        perfil(call)
     if call.data == 'servicos':
         servicos(call.message)
     if call.data == 'addsaldo':
