@@ -2,5 +2,7 @@
     "status": "off",
     "valor_min": 0.1,
     "valor_max": 2.0,
-    "chance_ganhar": 30
+    "chance_ganhar": 30,
+    "limite_tempo": "on",
+    "tempo_horas": 24
 }

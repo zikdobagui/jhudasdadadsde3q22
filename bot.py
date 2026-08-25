@@ -2057,7 +2057,9 @@ def roleta_default_config():
         "status": "off",
         "valor_min": 0.1,
         "valor_max": 2.0,
-        "chance_ganhar": 30
+        "chance_ganhar": 30,
+        "limite_tempo": "on",
+        "tempo_horas": 24
     }
 
 def carregar_config_roleta():
@@ -2068,6 +2070,8 @@ def carregar_config_roleta():
         config["valor_min"] = max(0.01, float(config.get("valor_min", 0.1)))
         config["valor_max"] = max(config["valor_min"], float(config.get("valor_max", 2.0)))
         config["chance_ganhar"] = min(100, max(0, float(config.get("chance_ganhar", 30))))
+        config["limite_tempo"] = "on" if config.get("limite_tempo", "on") == "on" else "off"
+        config["tempo_horas"] = max(1, float(config.get("tempo_horas", 24)))
     except Exception:
         config = roleta_default_config()
     return config
@@ -2078,14 +2082,36 @@ def salvar_config_roleta(config):
 def roleta_ativa():
     return carregar_config_roleta().get("status") == "on"
 
-def roleta_hoje():
-    return datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d')
+def roleta_agora():
+    return datetime.datetime.now(pytz.timezone('America/Sao_Paulo'))
 
 def carregar_giros_roleta():
     return _read_json_file(ROLETA_GIROS_PATH, {})
 
 def salvar_giros_roleta(giros):
     _write_json_file(ROLETA_GIROS_PATH, giros)
+
+def roleta_tempo_restante(giro, tempo_horas):
+    try:
+        ultimo_giro = datetime.datetime.fromisoformat(giro.get("quando"))
+        if ultimo_giro.tzinfo is None:
+            ultimo_giro = pytz.timezone('America/Sao_Paulo').localize(ultimo_giro)
+    except Exception:
+        return None
+
+    proximo_giro = ultimo_giro + datetime.timedelta(hours=float(tempo_horas))
+    restante = proximo_giro - roleta_agora()
+    if restante.total_seconds() <= 0:
+        return None
+    return restante
+
+def formatar_tempo_restante(delta):
+    total_seconds = int(delta.total_seconds())
+    horas, resto = divmod(total_seconds, 3600)
+    minutos = max(1, resto // 60)
+    if horas > 0:
+        return f"{horas}h {minutos}min"
+    return f"{minutos}min"
 
 def mostrar_roleta(call):
     config = carregar_config_roleta()
@@ -2103,7 +2129,7 @@ def mostrar_roleta(call):
     else:
         texto = (
             "🎰 <b>ROLETA DA SORTE</b>\n\n"
-            "Gire 1x por dia e concorra a saldo grátis!\n\n"
+            "Teste sua sorte e concorra a saldo grátis!\n\n"
             f"Prêmios de <b>R${config['valor_min']:.2f}</b> até "
             f"<b>R${config['valor_max']:.2f}</b>.\n"
             "Toque em girar e boa sorte! 🍀"
@@ -2129,10 +2155,15 @@ def girar_roleta(call):
 
     giros = carregar_giros_roleta()
     user_key = str(user_id)
-    hoje = roleta_hoje()
-    if giros.get(user_key, {}).get("data") == hoje:
-        bot.answer_callback_query(call.id, "Você já girou hoje. Volte amanhã!", show_alert=True)
-        return
+    if config.get("limite_tempo") == "on":
+        restante = roleta_tempo_restante(giros.get(user_key, {}), config["tempo_horas"])
+        if restante:
+            bot.answer_callback_query(
+                call.id,
+                f"Você já girou. Tente novamente em {formatar_tempo_restante(restante)}.",
+                show_alert=True
+            )
+            return
 
     if database.load_user_data(user_id) is None:
         username = getattr(call.from_user, 'username', None)
@@ -2145,10 +2176,11 @@ def girar_roleta(call):
         database.update_user_balance(user_id, premio)
 
     giros[user_key] = {
-        "data": hoje,
+        "data": roleta_agora().strftime('%Y-%m-%d'),
+        "quando": roleta_agora().isoformat(),
         "ganhou": ganhou,
         "valor": premio,
-        "hora": datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
+        "hora": roleta_agora().strftime('%d/%m/%Y %H:%M:%S')
     }
     salvar_giros_roleta(giros)
 
@@ -2159,13 +2191,13 @@ def girar_roleta(call):
         texto = (
             "🎰 <b>ROLETA DA SORTE!</b>\n\n"
             f"🎉 Você ganhou <b>R${premio:.2f}</b> de saldo grátis!\n"
-            "💵 Já caiu na sua conta. Volte amanhã pra girar de novo! 🍀"
+            "💵 Já caiu na sua conta. Boa sorte no próximo giro! 🍀"
         )
     else:
         texto = (
             "🎰 <b>ROLETA DA SORTE!</b>\n\n"
             "Não foi dessa vez.\n"
-            "Volte amanhã para tentar novamente! 🍀"
+            "Tente novamente quando a roleta liberar seu próximo giro! 🍀"
         )
 
     bot.edit_message_text(
@@ -2184,12 +2216,15 @@ def mostrar_admin_roleta(message):
 
     config = carregar_config_roleta()
     status_txt = "Ativada" if config.get("status") == "on" else "Desativada"
+    limite_txt = "Ativado" if config.get("limite_tempo") == "on" else "Desativado"
     texto = (
         "🎰 <b>CONFIGURAR ROLETA DA SORTE</b>\n\n"
         f"<b>Status:</b> {status_txt}\n"
         f"<b>Valor mínimo:</b> R${config['valor_min']:.2f}\n"
         f"<b>Valor máximo:</b> R${config['valor_max']:.2f}\n"
-        f"<b>Chance de ganhar:</b> {config['chance_ganhar']:.0f}%"
+        f"<b>Chance de ganhar:</b> {config['chance_ganhar']:.0f}%\n"
+        f"<b>Limite de tempo:</b> {limite_txt}\n"
+        f"<b>Tempo entre giros:</b> {config['tempo_horas']:.0f}h"
     )
     markup = InlineKeyboardMarkup()
     if config.get("status") == "on":
@@ -2199,6 +2234,8 @@ def mostrar_admin_roleta(message):
     markup.row(InlineKeyboardButton('Valor Mínimo', callback_data='roleta_admin_min'),
                InlineKeyboardButton('Valor Máximo', callback_data='roleta_admin_max'))
     markup.row(InlineKeyboardButton('Chance %', callback_data='roleta_admin_chance'))
+    markup.row(InlineKeyboardButton('Tempo On/Off', callback_data='roleta_admin_tempo_toggle'),
+               InlineKeyboardButton('Horas Espera', callback_data='roleta_admin_tempo_horas'))
     markup.row(InlineKeyboardButton('Voltar', callback_data='voltar_paineladm'))
 
     try:
@@ -2245,6 +2282,11 @@ def salvar_config_roleta_admin(message, campo):
     elif campo == 'valor_max':
         if valor < config["valor_min"]:
             bot.reply_to(message, "O valor máximo precisa ser maior ou igual ao mínimo.")
+            return
+        config[campo] = round(valor, 2)
+    elif campo == 'tempo_horas':
+        if valor < 1:
+            bot.reply_to(message, "O tempo precisa ser de pelo menos 1 hora.")
             return
         config[campo] = round(valor, 2)
 
@@ -7462,6 +7504,25 @@ def callback_query(call):
             return
         bot.answer_callback_query(call.id)
         pedir_config_roleta(call.message, 'chance_ganhar', 'chance de ganhar em %')
+        return
+
+    if call.data == 'roleta_admin_tempo_toggle':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        config = carregar_config_roleta()
+        config["limite_tempo"] = "off" if config.get("limite_tempo") == "on" else "on"
+        salvar_config_roleta(config)
+        bot.answer_callback_query(call.id, "Limite de tempo atualizado.", show_alert=True)
+        mostrar_admin_roleta(call.message)
+        return
+
+    if call.data == 'roleta_admin_tempo_horas':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        pedir_config_roleta(call.message, 'tempo_horas', 'tempo entre giros em horas')
         return
     
     # Criar backup manual
