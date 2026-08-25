@@ -15,7 +15,7 @@ REMOTE = os.getenv("AUTO_GIT_REMOTE", "origin")
 BRANCH = os.getenv("AUTO_GIT_BRANCH", "main")
 UPDATE_NOTIFY_FILE = ROOT / ".last_update_notify"
 LOCAL_DATA_DIRS = ("botoes",)
-LOCAL_DATA_FILES = ("settings/notify.json", "settings/roleta.json")
+LOCAL_DATA_FILES = ("settings/notify.json", "settings/roleta.json", "settings/button_overrides.json")
 
 
 def run_git(*args: str) -> subprocess.CompletedProcess:

@@ -820,10 +820,60 @@ def parse_valor_monetario(value) -> float:
         raise ValueError('o valor deve ser maior que zero')
     return round(valor, 2)
 
+BUTTON_OVERRIDES_PATH = os.path.join('settings', 'button_overrides.json')
+
+def load_button_overrides():
+    try:
+        with open(BUTTON_OVERRIDES_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def save_button_overrides(data):
+    os.makedirs(os.path.dirname(BUTTON_OVERRIDES_PATH), exist_ok=True)
+    with open(BUTTON_OVERRIDES_PATH, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def button_override_key(filename_or_name: str) -> str:
+    base = os.path.basename(str(filename_or_name))
+    return base[:-4] if base.lower().endswith('.txt') else base
+
+def get_button_override(filename_or_name: str):
+    return load_button_overrides().get(button_override_key(filename_or_name))
+
+def set_button_override(filename_or_name: str, content: str):
+    data = load_button_overrides()
+    data[button_override_key(filename_or_name)] = content
+    save_button_overrides(data)
+
+def migrate_colored_button_files_to_overrides():
+    if os.path.exists(BUTTON_OVERRIDES_PATH):
+        return
+    if not os.path.isdir('botoes'):
+        return
+    overrides = {}
+    for filename in os.listdir('botoes'):
+        if not filename.lower().endswith('.txt'):
+            continue
+        path = os.path.join('botoes', filename)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+        except Exception:
+            continue
+        if _extract_button_color(content):
+            overrides[button_override_key(filename)] = content
+    if overrides:
+        save_button_overrides(overrides)
+
 def botao_personalizado(nome_arquivo: str, padrao: str) -> str:
     os.makedirs('botoes', exist_ok=True)
     path = os.path.join('botoes', f'{nome_arquivo}.txt')
     try:
+        override = get_button_override(nome_arquivo)
+        if isinstance(override, str) and override.strip():
+            return override.strip()
         if not os.path.exists(path):
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(padrao)
@@ -2688,6 +2738,8 @@ def _compose_button_content(text: str, color=None) -> str:
         return f"[cor:{color}] {clean_text}"
     return clean_text
 
+migrate_colored_button_files_to_overrides()
+
 def salvar_botao_editado(message):
     state = pending_button_edit.get(message.chat.id)
     if not state:
@@ -2714,9 +2766,8 @@ def salvar_botao_editado(message):
             label = state['service']
         else:
             content = _compose_button_content(content, state.get('color'))
-            with open(state['path'], 'w', encoding='utf-8') as f:
-                f.write(content)
-            label = os.path.basename(state['path'])
+            set_button_override(state['filename'], content)
+            label = state['filename']
         pending_button_edit.pop(message.chat.id, None)
         bot.reply_to(
             message,
@@ -2763,9 +2814,8 @@ def salvar_cor_botao(message, color):
             label = state['service']
         else:
             content = _compose_button_content(state.get('text', ''), new_color)
-            with open(state['path'], 'w', encoding='utf-8') as f:
-                f.write(content)
-            label = os.path.basename(state['path'])
+            set_button_override(state['filename'], content)
+            label = state['filename']
         pending_button_edit.pop(message.chat.id, None)
         color_label = 'sem cor' if new_color is None else new_color
         bot.send_message(
@@ -2790,8 +2840,12 @@ def _list_botoes_files():
 def _button_editor_label(filename: str) -> str:
     path = os.path.join('botoes', filename)
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read().strip()
+        override = get_button_override(filename)
+        if isinstance(override, str) and override.strip():
+            content = override.strip()
+        else:
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
         label = _strip_button_color_tag(content)
         label = strip_tg_emoji_tags(label)
         label = fix_mojibake_text(label)
@@ -2886,8 +2940,12 @@ def abrir_editor_botao_servico(message, index):
 def _send_botoes_file_preview_and_wait(message, filename):
     path = os.path.join('botoes', filename)
     try:
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        override = get_button_override(filename)
+        if isinstance(override, str) and override.strip():
+            content = override
+        else:
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
     except Exception as e:
         bot.reply_to(message, f"âœ… Erro ao abrir {filename}: {e}")
         return
