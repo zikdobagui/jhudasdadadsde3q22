@@ -20,5 +20,6 @@ database/*.sqlite
 database/*.sqlite3
 database/users/
 database/roleta_giros.json
+database/login_registry.json
 
 qrcode*.png

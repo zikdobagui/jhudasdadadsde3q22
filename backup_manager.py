@@ -18,6 +18,7 @@ class BackupManager:
         self.config_file = 'backup_config.json'
         self.is_running = False
         self.backup_thread = None
+        self.auto_backup_callback = None
         
         # Criar diretório de backups se não existir
         if not os.path.exists(self.backup_dir):
@@ -194,17 +195,28 @@ class BackupManager:
         while self.is_running:
             if self.config.get('auto_backup_enabled', False):
                 interval_hours = self.config.get('backup_interval_hours', 6)
-                interval_seconds = interval_hours * 3600
-                
-                # Aguardar intervalo
-                time.sleep(interval_seconds)
-                
-                # Criar backup
-                if self.is_running and self.config.get('auto_backup_enabled', False):
+                last_backup = self.config.get('last_backup')
+                try:
+                    last_backup_date = datetime.fromisoformat(last_backup) if last_backup else None
+                except (TypeError, ValueError):
+                    last_backup_date = None
+                elapsed = (datetime.now() - last_backup_date).total_seconds() if last_backup_date else None
+
+                if elapsed is None or elapsed >= interval_hours * 3600:
                     print(f"[BACKUP] Criando backup automático...")
                     backup_path = self.create_backup()
                     if backup_path:
                         print(f"[BACKUP] Backup automático criado: {os.path.basename(backup_path)}")
+                        if callable(self.auto_backup_callback):
+                            try:
+                                enviado = self.auto_backup_callback(backup_path)
+                                if enviado is False:
+                                    self.config['last_backup'] = None
+                                    self.save_config()
+                                    print("[BACKUP] Envio falhou; uma nova tentativa sera feita.")
+                            except Exception as e:
+                                print(f"[BACKUP] Erro ao processar backup automático: {e}")
+                time.sleep(60)
             else:
                 time.sleep(60)  # Verificar a cada minuto se foi reativado
     

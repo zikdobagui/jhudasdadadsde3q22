@@ -1192,6 +1192,51 @@ def notificar_versao_atual_aos_admins():
 
 notificar_versao_atual_aos_admins()
 
+def enviar_backup_automatico_aos_admins(backup_path):
+    enviado = False
+    try:
+        admin_ids = {int(api.CredentialsChange.id_dono())}
+        admins_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database', 'admins.json')
+        if os.path.exists(admins_path):
+            with open(admins_path, 'r', encoding='utf-8') as arquivo:
+                admins = json.load(arquivo).get('admins', [])
+            admin_ids.update(int(admin['id']) for admin in admins if admin.get('id'))
+
+        horario = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        for admin_id in admin_ids:
+            try:
+                with open(backup_path, 'rb') as arquivo:
+                    bot.send_document(
+                        admin_id,
+                        arquivo,
+                        caption=(
+                            '<b>Backup automático dos dados importantes</b>\n\n'
+                            f'<b>Data:</b> {horario}\n'
+                            '<i>Guarde este arquivo em local seguro.</i>'
+                        ),
+                        parse_mode='HTML'
+                    )
+                    enviado = True
+            except Exception as error:
+                print(f'[BACKUP] Falha ao enviar para o admin {admin_id}: {error}', flush=True)
+    finally:
+        try:
+            if backup_path and os.path.exists(backup_path):
+                os.remove(backup_path)
+                print(f'[BACKUP] Arquivo temporário removido: {backup_path}', flush=True)
+        except OSError as error:
+            print(f'[BACKUP] Falha ao remover arquivo temporário: {error}', flush=True)
+    return enviado
+
+backup_manager.auto_backup_callback = enviar_backup_automatico_aos_admins
+try:
+    total_contas_registradas = api.ControleLogins.inicializar_registro()
+    print(f'[LOGIN] Histórico de duplicatas carregado: {total_contas_registradas} conta(s).', flush=True)
+except Exception as error:
+    print(f'[LOGIN] Falha ao inicializar histórico de duplicatas: {error}', flush=True)
+if backup_manager.config.get('auto_backup_enabled', False):
+    backup_manager.start_auto_backup()
+
 try:
     bot.send_message(
         chat_id=api.CredentialsChange.id_dono(),
@@ -3651,7 +3696,7 @@ def adicionar_login(message):
                         senha = s[3].strip()
                         preco = parse_valor_monetario(s[4])
                         descricao = s[5].strip()
-                        api.ControleLogins.add_login(
+                        adicionado = api.ControleLogins.add_login(
                             nome=servico,
                             valor=preco,
                             descricao=descricao,
@@ -3659,6 +3704,9 @@ def adicionar_login(message):
                             senha=senha,
                             duracao='30'
                         )
+                        if not adicionado:
+                            bot.reply_to(message, f'Conta duplicada ignorada: <code>{html.escape(email)}</code> em <b>{html.escape(servico)}</b>.', parse_mode='HTML')
+                            continue
                         quantity += 1
                         notificacoes[servico] = notificacoes.get(servico, 0) + 1
                         
@@ -3692,7 +3740,7 @@ def adicionar_login(message):
                                 f'O valor do serviÃ§o {servico} Ã© invÃ¡lido. Use, por exemplo: 12.99 ou 12,99.'
                             )
                             continue
-                        api.ControleLogins.add_login(
+                        adicionado = api.ControleLogins.add_login(
                             nome=servico,
                             valor=valor,
                             descricao=descricao,
@@ -3700,6 +3748,9 @@ def adicionar_login(message):
                             senha=senha,
                             duracao=duracao
                         )
+                        if not adicionado:
+                            bot.reply_to(message, f'Conta duplicada ignorada: <code>{html.escape(email)}</code> em <b>{html.escape(servico)}</b>.', parse_mode='HTML')
+                            continue
                         quantity += 1
                         notificacoes[servico] = notificacoes.get(servico, 0) + 1
                     else:
@@ -9475,16 +9526,24 @@ def finalizar_adicao_logins(user_id):
         
         if quantidade > 0:
             notificacoes = {}
+            adicionados = 0
+            duplicados = 0
          
             for login in logins:
                 try:
                     nome, valor, descricao, email, senha, duracao = login.split('/')
-                    api.ControleLogins.add_login(nome=nome, valor=valor, descricao=descricao, email=email, senha=senha, duracao=duracao)
+                    if not api.ControleLogins.add_login(nome=nome, valor=valor, descricao=descricao, email=email, senha=senha, duracao=duracao):
+                        duplicados += 1
+                        continue
+                    adicionados += 1
                     notificacoes[nome] = notificacoes.get(nome, 0) + 1
                 except ValueError:
                     continue  
 
-            bot.send_message(user_id, f"âœ… AdiÃ§Ã£o de logins finalizada com sucesso! {quantidade} logins foram adicionados.")
+            bot.send_message(
+                user_id,
+                f"✅ Adição finalizada: {adicionados} login(s) adicionado(s) e {duplicados} duplicado(s) ignorado(s)."
+            )
             for prod, qtd in notificacoes.items():
                 notificar_novos_logins(prod, qtd)
         else:

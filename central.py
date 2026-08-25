@@ -8,6 +8,7 @@ import random
 import html
 import pytz
 import os
+import threading
 from datetime import timezone
 from database import load_user_data, save_user_data
 from pytz import timezone
@@ -884,6 +885,68 @@ class FuncaoTransmitir:
 # Outras classes ou funções podem continuar aqui...
 
 class ControleLogins():
+    _registry_lock = threading.RLock()
+    _registry_path = 'database/login_registry.json'
+
+    @staticmethod
+    def _normalizar_conta(nome, email):
+        return f'{str(nome).strip().casefold()}|{str(email).strip().casefold()}'
+
+    @classmethod
+    def _carregar_registro(cls):
+        if os.path.exists(cls._registry_path):
+            try:
+                with open_utf8(cls._registry_path, 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and isinstance(data.get('contas'), dict):
+                    return data
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        contas = {}
+        try:
+            with open_utf8('database/acessos.json', 'r') as f:
+                acessos = json.load(f).get('acessos', [])
+            for acesso in acessos:
+                nome, email = acesso.get('nome'), acesso.get('email')
+                if nome and email:
+                    contas[cls._normalizar_conta(nome, email)] = {
+                        'servico': str(nome).strip(),
+                        'login': str(email).strip(),
+                        'origem': 'estoque_existente'
+                    }
+        except (OSError, json.JSONDecodeError):
+            pass
+
+        users_dir = 'database/users'
+        if os.path.isdir(users_dir):
+            for filename in os.listdir(users_dir):
+                if not filename.endswith('.json'):
+                    continue
+                try:
+                    with open_utf8(os.path.join(users_dir, filename), 'r') as f:
+                        compras = json.load(f).get('compras', [])
+                    for compra in compras:
+                        nome, email = compra.get('servico'), compra.get('email')
+                        if nome and email:
+                            contas[cls._normalizar_conta(nome, email)] = {
+                                'servico': str(nome).strip(),
+                                'login': str(email).strip(),
+                                'origem': 'historico_de_compra'
+                            }
+                except (OSError, json.JSONDecodeError, AttributeError):
+                    continue
+
+        data = {'contas': contas}
+        os.makedirs(os.path.dirname(cls._registry_path), exist_ok=True)
+        with open_utf8(cls._registry_path, 'w') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        return data
+
+    @classmethod
+    def inicializar_registro(cls):
+        with cls._registry_lock:
+            return len(cls._carregar_registro().get('contas', {}))
   
     @classmethod
     def peek_primeiro_disponivel(cls, servico: str):
@@ -905,12 +968,26 @@ class ControleLogins():
 
   
     def add_login(nome, valor, descricao, email, senha, duracao):
-        with open_utf8('database/acessos.json', 'r') as f:
-            data = json.load(f)
-        data["acessos"].append({"nome": nome, "valor": valor, "descricao": descricao, "email": email, "senha": senha, "duracao": duracao})
-        with open_utf8('database/acessos.json', 'w') as f:
-            json.dump(data, f, indent=4)
-        return True
+        with ControleLogins._registry_lock:
+            registro = ControleLogins._carregar_registro()
+            chave = ControleLogins._normalizar_conta(nome, email)
+            if chave in registro['contas']:
+                return False
+
+            with open_utf8('database/acessos.json', 'r') as f:
+                data = json.load(f)
+            data["acessos"].append({"nome": nome, "valor": valor, "descricao": descricao, "email": email, "senha": senha, "duracao": duracao})
+            with open_utf8('database/acessos.json', 'w') as f:
+                json.dump(data, f, indent=4)
+
+            registro['contas'][chave] = {
+                'servico': str(nome).strip(),
+                'login': str(email).strip(),
+                'origem': 'cadastro'
+            }
+            with open_utf8(ControleLogins._registry_path, 'w') as f:
+                json.dump(registro, f, indent=2, ensure_ascii=False)
+            return True
     # remover login
     def remover_login(nome, email):
         with open_utf8('database/acessos.json', 'r') as f:
