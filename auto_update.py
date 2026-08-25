@@ -15,6 +15,7 @@ REMOTE = os.getenv("AUTO_GIT_REMOTE", "origin")
 BRANCH = os.getenv("AUTO_GIT_BRANCH", "main")
 UPDATE_NOTIFY_FILE = ROOT / ".last_update_notify"
 LOCAL_DATA_DIRS = ("botoes",)
+LOCAL_DATA_FILES = ("settings/notify.json", "settings/roleta.json")
 
 
 def run_git(*args: str) -> subprocess.CompletedProcess:
@@ -151,7 +152,10 @@ def local_change_paths() -> list[str] | None:
 
 def is_preserved_local_path(path: str) -> bool:
     normalized = path.replace("\\", "/").lstrip("/")
-    return any(normalized == item or normalized.startswith(f"{item}/") for item in LOCAL_DATA_DIRS)
+    return (
+        any(normalized == item or normalized.startswith(f"{item}/") for item in LOCAL_DATA_DIRS)
+        or normalized in LOCAL_DATA_FILES
+    )
 
 
 def has_blocking_local_changes() -> bool:
@@ -174,15 +178,27 @@ def backup_local_data():
             destination = temp_dir / dirname
             shutil.copytree(source, destination)
             backups.append((source, destination))
+    for filename in LOCAL_DATA_FILES:
+        source = ROOT / filename
+        if source.exists():
+            destination = temp_dir / filename
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+            backups.append((source, destination))
     return temp_dir, backups
 
 
 def restore_local_data(temp_dir: Path, backups) -> None:
     try:
         for source, backup in backups:
-            if source.exists():
+            if backup.is_file():
+                source.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(backup, source)
+            elif source.exists():
                 shutil.rmtree(source)
-            shutil.copytree(backup, source)
+                shutil.copytree(backup, source)
+            else:
+                shutil.copytree(backup, source)
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -190,6 +206,8 @@ def restore_local_data(temp_dir: Path, backups) -> None:
 def reset_preserved_paths_for_pull() -> None:
     for dirname in LOCAL_DATA_DIRS:
         run_git("checkout", "--", dirname)
+    for filename in LOCAL_DATA_FILES:
+        run_git("checkout", "--", filename)
 
 
 def update() -> bool:

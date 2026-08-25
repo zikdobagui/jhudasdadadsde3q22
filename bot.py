@@ -1431,6 +1431,7 @@ def painel_admin(message):
                    InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
         markup.row(InlineKeyboardButton(f'{megaphone} Notificacoes Fake', callback_data='configurar_notificacoes_fake'),
                    InlineKeyboardButton(f'{check} Gift Card', callback_data='gift_card'))
+        markup.row(InlineKeyboardButton('📣 Destinos Reais', callback_data='config_destinos_reais'))
         markup.row(InlineKeyboardButton(f'{memo} Editar Textos', callback_data='editar_textos'),
                    InlineKeyboardButton(f'{image_icon} Gerenciar Imagens', callback_data='gerenciar_imagens'))
         markup.row(InlineKeyboardButton(f'{card} Configurar Pagamentos', callback_data='configurar_pagamentos'))
@@ -4852,6 +4853,51 @@ def mudar_grupo_alvo(message):
     gp = message.text
     api.Notificacoes.trocar_id_grupo(gp)
     bot.reply_to(message, "Alterado com sucesso.")
+
+def configurar_destinos_reais(message):
+    try:
+        destino_logs = api.Log.id_log_destino()
+    except Exception:
+        destino_logs = api.CredentialsChange.id_dono()
+
+    texto = (
+        "📣 <b>DESTINOS REAIS DE NOTIFICAÇÃO</b>\n\n"
+        f"🛒 <b>Vendas/recargas:</b> <code>{get_sales_notification_chat_id()}</code>\n"
+        f"📋 <b>Logs:</b> <code>{destino_logs}</code>\n\n"
+        "Altere aqui os canais ou grupos reais onde o bot envia avisos.\n"
+        "Para canal/grupo, use o ID completo, geralmente começando com <code>-100</code>."
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('🛒 Alterar Vendas/Recargas', callback_data='alterar_destino_vendas'))
+    markup.row(InlineKeyboardButton('📋 Alterar Logs', callback_data='alterar_destino_logs'))
+    markup.row(InlineKeyboardButton('✅ Voltar', callback_data='voltar_paineladm'))
+
+    try:
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def alterar_destino_vendas(message):
+    try:
+        chat_id = int((message.text or '').strip())
+        set_sales_notification_chat_id(chat_id)
+        bot.reply_to(message, f"Destino de vendas/recargas alterado para <code>{chat_id}</code>.", parse_mode='HTML')
+    except Exception:
+        bot.reply_to(message, "Falha ao alterar. Envie apenas o ID numérico do canal/grupo.")
+
+def alterar_destino_logs(message):
+    try:
+        chat_id = int((message.text or '').strip())
+        api.Log.mudar_destino_logs(chat_id)
+        bot.reply_to(message, f"Destino de logs alterado para <code>{chat_id}</code>.", parse_mode='HTML')
+    except Exception:
+        bot.reply_to(message, "Falha ao alterar. Envie apenas o ID numérico do canal/grupo.")
 
 def trocar_texto_saldo(message):
     txt = message.text
@@ -8637,6 +8683,26 @@ def callback_query(call):
         )
 
     # =============== ConfiguraÃ§Ãµes notificaÃ§Ã£o
+    if call.data == 'config_destinos_reais':
+        configurar_destinos_reais(call.message)
+    if call.data == 'alterar_destino_vendas':
+        bot.send_message(
+            call.message.chat.id,
+            "Me envie o ID do canal/grupo real para receber notificações de vendas e recargas:\n\n"
+            "Exemplo: <code>-1001234567890</code>",
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(call.message, alterar_destino_vendas)
+    if call.data == 'alterar_destino_logs':
+        bot.send_message(
+            call.message.chat.id,
+            "Me envie o ID do canal/grupo real para receber logs:\n\n"
+            "Exemplo: <code>-1001234567890</code>",
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(call.message, alterar_destino_logs)
     if call.data == 'configurar_notificacoes_fake':
         configurar_notificacoes(call.message)
     if call.data == 'status_notificacoes':
