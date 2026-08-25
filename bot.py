@@ -2405,20 +2405,40 @@ def pagar_comissao_afiliado(indicado_id, valor_recarga):
 
     return comissao
 
+def exibir_texto_no_callback(call, texto, markup, **kwargs):
+    if call.message.content_type == 'text':
+        return bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text=texto,
+            reply_markup=markup,
+            **kwargs
+        )
+
+    try:
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+    except ApiTelegramException:
+        pass
+    return bot.send_message(
+        chat_id=call.message.chat.id,
+        text=texto,
+        reply_markup=markup,
+        **kwargs
+    )
+
 def mostrar_indique_ganhe(call):
     if not api.AfiliadosInfo.status_afiliado():
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text=(
+        exibir_texto_no_callback(
+            call,
+            (
                 "👥 <b>INDIQUE E GANHE</b>\n\n"
                 "O sistema de indicações está desativado no momento.\n"
                 "Um administrador pode ativar em /admin."
             ),
             parse_mode='HTML',
-            reply_markup=markup
+            markup=markup
         )
         return
 
@@ -2447,12 +2467,11 @@ def mostrar_indique_ganhe(call):
     markup.row(InlineKeyboardButton('📤 Compartilhar meu link', url=share_url))
     markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
 
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text=texto,
+    exibir_texto_no_callback(
+        call,
+        texto,
+        markup,
         parse_mode='HTML',
-        reply_markup=markup,
         disable_web_page_preview=True
     )
 
@@ -5527,6 +5546,7 @@ def perfil(call):
     markup = InlineKeyboardMarkup()
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
+    markup.add(InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(user)
