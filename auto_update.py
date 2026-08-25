@@ -1,7 +1,9 @@
 import os
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -12,6 +14,7 @@ ROOT = Path(__file__).resolve().parent
 REMOTE = os.getenv("AUTO_GIT_REMOTE", "origin")
 BRANCH = os.getenv("AUTO_GIT_BRANCH", "main")
 UPDATE_NOTIFY_FILE = ROOT / ".last_update_notify"
+LOCAL_DATA_DIRS = ("botoes",)
 
 
 def run_git(*args: str) -> subprocess.CompletedProcess:
@@ -133,12 +136,60 @@ def has_git_repo() -> bool:
     return result.returncode == 0 and result.stdout.strip() == "true"
 
 
-def has_local_changes() -> bool:
+def local_change_paths() -> list[str] | None:
     result = run_git("status", "--porcelain")
     if result.returncode != 0:
         log(f"Nao foi possivel checar alteracoes locais:\n{result.stdout.strip()}")
+        return None
+    paths = []
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            continue
+        paths.append(line[3:].strip().strip('"'))
+    return paths
+
+
+def is_preserved_local_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").lstrip("/")
+    return any(normalized == item or normalized.startswith(f"{item}/") for item in LOCAL_DATA_DIRS)
+
+
+def has_blocking_local_changes() -> bool:
+    paths = local_change_paths()
+    if paths is None:
         return True
-    return bool(result.stdout.strip())
+    blocking = [path for path in paths if not is_preserved_local_path(path)]
+    if blocking:
+        log("Existem alteracoes locais rastreadas fora de dados preservados; pulei o git pull.")
+        return True
+    return False
+
+
+def backup_local_data():
+    temp_dir = Path(tempfile.mkdtemp(prefix="auto_update_local_", dir=str(ROOT)))
+    backups = []
+    for dirname in LOCAL_DATA_DIRS:
+        source = ROOT / dirname
+        if source.exists():
+            destination = temp_dir / dirname
+            shutil.copytree(source, destination)
+            backups.append((source, destination))
+    return temp_dir, backups
+
+
+def restore_local_data(temp_dir: Path, backups) -> None:
+    try:
+        for source, backup in backups:
+            if source.exists():
+                shutil.rmtree(source)
+            shutil.copytree(backup, source)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def reset_preserved_paths_for_pull() -> None:
+    for dirname in LOCAL_DATA_DIRS:
+        run_git("checkout", "--", dirname)
 
 
 def update() -> bool:
@@ -150,8 +201,7 @@ def update() -> bool:
         log("Este ambiente nao tem repositorio Git; iniciando sem atualizar.")
         return False
 
-    if has_local_changes():
-        log("Existem alteracoes locais rastreadas; pulei o git pull para nao sobrescrever dados.")
+    if has_blocking_local_changes():
         return False
 
     log(f"Buscando atualizacoes de {REMOTE}/{BRANCH}...")
@@ -173,10 +223,15 @@ def update() -> bool:
     old_commit = local.stdout.strip()
     new_commit = upstream.stdout.strip()
 
-    pull = run_git("pull", "--ff-only", REMOTE, BRANCH)
-    if pull.returncode != 0:
-        log(f"Falha no git pull:\n{pull.stdout.strip()}")
-        return False
+    temp_dir, backups = backup_local_data()
+    try:
+        reset_preserved_paths_for_pull()
+        pull = run_git("pull", "--ff-only", REMOTE, BRANCH)
+        if pull.returncode != 0:
+            log(f"Falha no git pull:\n{pull.stdout.strip()}")
+            return False
+    finally:
+        restore_local_data(temp_dir, backups)
 
     log("Atualizacao aplicada com sucesso.")
     notify_admins_updated(old_commit, new_commit)
