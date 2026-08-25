@@ -1874,15 +1874,6 @@ def receber_carrinho_miniapp(message):
             parse_mode='HTML'
         )
 
-def enviar_botao_miniapp(message):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add(types.KeyboardButton('🛍️ ABRIR LOJA AGORA', web_app=types.WebAppInfo(url=MINIAPP_URL)))
-    bot.send_message(
-        message.chat.id,
-        '🛍️ Toque no botão abaixo para abrir a loja. Quando finalizar, o carrinho volta direto para o bot.',
-        reply_markup=markup
-    )
-
 def notificar_reabastecimento(produto):
     """Notifica usuÃ¡rios que estÃ©o aguardando um produto"""
     usuarios = database.get_usuarios_aguardando_produto(produto)
@@ -4375,7 +4366,7 @@ def processar_lote_usuarios(
 def gerar_menu_principal():
     bt_miniapp = InlineKeyboardButton(
         '🛍️ ABRIR LOJA',
-        callback_data='abrir_miniapp'
+        web_app=types.WebAppInfo(url=MINIAPP_URL)
     )
     bt_comprar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('catalogo', 'VER CATÃLOGO'), callback_data='servicos'), 'catalogo')
     bt_addsaldo = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('recarga_pix', 'RECARGA / PIX'), callback_data='addsaldo'), 'pix')
@@ -7408,11 +7399,6 @@ def callback_query(call):
         menu_categorias_servicos(call.message)
         return
 
-    if call.data == 'abrir_miniapp':
-        bot.answer_callback_query(call.id)
-        enviar_botao_miniapp(call.message)
-        return
-    
     if call.data == 'suporte_user':
         link_suporte = api.CredentialsChange.SuporteInfo.link_suporte()
         markup = InlineKeyboardMarkup()

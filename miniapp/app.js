@@ -140,7 +140,7 @@ checkout.addEventListener('click', () => {
   if (!items.length) return;
   const payload = JSON.stringify({ action: 'miniapp_cart', items });
   if (!tg?.initData || typeof tg.sendData !== 'function') {
-    return showToast('Abra pelo botão ABRIR LOJA AGORA no Telegram');
+    return showToast('Abra a loja dentro do Telegram para enviar');
   }
   checkout.disabled = true;
   checkout.textContent = 'Enviando para o bot...';
