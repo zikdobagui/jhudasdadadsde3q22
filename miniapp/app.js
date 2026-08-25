@@ -1,5 +1,6 @@
 const tg = window.Telegram?.WebApp;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const botUsername = 'vendasdoramon_bot';
 const state = { products: [], cart: new Map(), filter: 'todos', query: '' };
 
 const list = document.querySelector('#productList');
@@ -136,17 +137,26 @@ document.querySelector('#cartButton').addEventListener('click', () => showCart(t
 document.querySelector('#closeCart').addEventListener('click', () => showCart(false));
 document.querySelector('#closeCartIcon').addEventListener('click', () => showCart(false));
 checkout.addEventListener('click', () => {
-  const items = [...state.cart.entries()].map(([servico, quantidade]) => ({ servico, quantidade }));
+  const items = [...state.cart.entries()].map(([servico, quantidade]) => {
+    const idx = state.products.findIndex((product) => product.name === servico);
+    return `${idx}x${quantidade}`;
+  });
   if (!items.length) return;
-  const payload = JSON.stringify({ action: 'miniapp_cart', items });
-  if (!tg?.initData || typeof tg.sendData !== 'function') {
-    return showToast('Abra a loja dentro do Telegram para enviar');
+  if (items.some((item) => item.startsWith('-1x'))) {
+    return showToast('Atualize a loja e tente novamente');
   }
+  const startPayload = `mc_${items.join('_')}`;
+  if (startPayload.length > 64) {
+    checkout.disabled = false;
+    return showToast('Envie menos itens por vez para abrir no bot');
+  }
+  const link = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
   checkout.disabled = true;
-  checkout.textContent = 'Enviando para o bot...';
-  tg.sendData(payload);
+  checkout.textContent = 'Abrindo pagamento no bot...';
   tg.HapticFeedback?.notificationOccurred('success');
-  window.setTimeout(() => tg.close(), 350);
+  if (tg?.openTelegramLink) tg.openTelegramLink(link);
+  else window.location.href = link;
+  window.setTimeout(() => tg?.close?.(), 500);
 });
 
 fetch('catalog.json', { cache: 'no-store' })

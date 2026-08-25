@@ -1874,6 +1874,79 @@ def receber_carrinho_miniapp(message):
             parse_mode='HTML'
         )
 
+def carregar_catalogo_miniapp():
+    try:
+        with open(os.path.join('miniapp', 'catalog.json'), 'r', encoding='utf-8') as f:
+            produtos = json.load(f)
+        if isinstance(produtos, list):
+            return produtos
+    except Exception:
+        pass
+    return []
+
+def importar_carrinho_miniapp_start(message, payload):
+    if len(payload or '') > 64 or not re.fullmatch(r'mc_(?:\d+x\d+)(?:_\d+x\d+)*', payload or ''):
+        return False
+
+    catalogo = carregar_catalogo_miniapp()
+    if not catalogo:
+        bot.send_message(message.chat.id, 'Não consegui carregar o catálogo da loja. Tente pelo catálogo do bot.')
+        return True
+
+    solicitados = {}
+    for item in payload[3:].split('_'):
+        idx_text, qtd_text = item.split('x', 1)
+        idx = int(idx_text)
+        quantidade = int(qtd_text)
+        if idx < 0 or idx >= len(catalogo) or quantidade < 1 or quantidade > 10:
+            bot.send_message(message.chat.id, 'Carrinho inválido. Abra a loja e tente novamente.')
+            return True
+        servico = str(catalogo[idx].get('name') or '').strip()
+        if not servico:
+            bot.send_message(message.chat.id, 'Um produto do carrinho não foi encontrado.')
+            return True
+        solicitados[servico] = solicitados.get(servico, 0) + quantidade
+
+    acessos = api.ControleLogins.pegar_servicos()
+    disponiveis = {}
+    for acesso in acessos:
+        nome = acesso['nome']
+        if nome not in disponiveis:
+            disponiveis[nome] = {'valor': float(acesso['valor']), 'estoque': 0}
+        disponiveis[nome]['estoque'] += 1
+
+    for servico, quantidade in solicitados.items():
+        produto = disponiveis.get(servico)
+        if not produto or quantidade > produto['estoque']:
+            bot.send_message(
+                message.chat.id,
+                f'O produto <b>{html.escape(servico)}</b> não tem estoque suficiente agora.',
+                parse_mode='HTML'
+            )
+            return True
+
+    user_id = message.from_user.id
+    database.clear_carrinho(user_id)
+    for servico, quantidade in solicitados.items():
+        database.add_to_carrinho(user_id, servico, disponiveis[servico]['valor'])
+        database.update_quantidade_carrinho(user_id, servico, quantidade)
+
+    total = database.get_carrinho_total(user_id)
+    saldo = database.get_user_balance(user_id)
+    if saldo < total:
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton('💰 ADICIONAR SALDO', callback_data='addsaldo'))
+        markup.row(InlineKeyboardButton('🛒 VER CARRINHO', callback_data='ver_carrinho'))
+        bot.send_message(
+            message.chat.id,
+            f'🛒 Carrinho recebido da loja.\n\nTotal: R$ {total:.2f}\nSeu saldo: R$ {saldo:.2f}\n\nAdicione saldo para finalizar.',
+            reply_markup=markup
+        )
+        return True
+
+    solicitar_aceite_termos(message, 'carrinho', {})
+    return True
+
 def notificar_reabastecimento(produto):
     """Notifica usuÃ¡rios que estÃ©o aguardando um produto"""
     usuarios = database.get_usuarios_aguardando_produto(produto)
@@ -5665,6 +5738,15 @@ def handle_start(message):
 
     if not ensure_reserve_access(message.from_user.id, message.chat.id):
         return
+
+    start_payload = ''
+    if message.text:
+        parts = message.text.split(maxsplit=1)
+        if len(parts) == 2:
+            start_payload = parts[1].strip()
+    if start_payload.startswith('mc_'):
+        if importar_carrinho_miniapp_start(message, start_payload):
+            return
 
     # VERIFICAÃ‡ÃƒO DE PARTICIPAÃ‡ÃƒO OBRIGATÃ“RIA NO GRUPO/CANAL - COMENTADO
     # try:
