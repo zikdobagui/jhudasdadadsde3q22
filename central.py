@@ -371,6 +371,18 @@ class Notificacoes():
         with open_utf8('settings/notify.json', 'w') as f:
             json.dump(data, f, indent=4)
         return
+    def min_max_ids():
+        with open_utf8('settings/notify.json', 'r') as f:
+            data = json.load(f)
+        return int(data.get("id_min", 898012903)), int(data.get("id_max", 4290812093))
+    def trocar_min_max_ids(id_min, id_max):
+        with open_utf8('settings/notify.json', 'r') as f:
+            data = json.load(f)
+        data["id_min"] = int(id_min)
+        data["id_max"] = int(id_max)
+        with open_utf8('settings/notify.json', 'w') as f:
+            json.dump(data, f, indent=4)
+        return
     def tempo_minimo_compras():
         with open_utf8('settings/notify.json', 'r') as f:
             data = json.load(f)
@@ -489,14 +501,16 @@ class Notificacoes():
             f.write(texto)
     def texto_notificacao_saldo():
         texto = Notificacoes.pegar_texto_saldo()
-        id = random.randint(898012903, 4290812093)
+        id_min, id_max = Notificacoes.min_max_ids()
+        id = random.randint(min(id_min, id_max), max(id_min, id_max))
         saldo_min, saldo_max = Notificacoes.min_max_saldo()
         saldo =  random.randint(int(saldo_min), int(saldo_max))
         texto = texto.replace('{id}', f'{id}').replace('{saldo}', f'{saldo}')
         return texto
     def texto_notificacao_compra():
         texto = Notificacoes.pegar_texto_compra()
-        id = random.randint(898012903, 4290812093)
+        id_min, id_max = Notificacoes.min_max_ids()
+        id = random.randint(min(id_min, id_max), max(id_min, id_max))
         if Notificacoes.modo_servico() == 0:
             servico, valor = Notificacoes.pegar_servico_random()
         else:

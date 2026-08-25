@@ -4788,9 +4788,11 @@ def mudar_min_bonus(message):
 
 def configurar_notificacoes(message):
     quantidade_servico = api.Notificacoes.quantidade_de_servicos_pra_sortear()
+    id_min, id_max = api.Notificacoes.min_max_ids()
     texto = (
         f'â€¢ <b>GRUPO ALVO:</b> {api.Notificacoes.id_grupo()}\n\n\n'
         f'â€¢ <b>NOTIFICAÃ‡Ã•ES FAKES CONFIGURAÃ‡Ã•ES</b> âš™ï¸\n\n'
+        f'â€¢ <b>IDs aleatÃ³rios:</b> entre <code>{id_min}</code> e <code>{id_max}</code>\n\n'
         f'â€¢ <b>NOTIFICAÃ‡ÃƒO DE RECARGA:</b>\n'
         f'âš™ï¸ <b>Tempo de espera:</b> selecionando entre {api.Notificacoes.tempo_minimo_saldo()} e {api.Notificacoes.tempo_maximo_saldo()} segundos\n'
         f'â€¢ <b>Selecionando aleatoriamente entre: R${api.Notificacoes.min_max_saldo()[0]:.2f} e R${api.Notificacoes.min_max_saldo()[1]:.2f} de saldo.</b>\n\n\n'
@@ -4811,11 +4813,12 @@ def configurar_notificacoes(message):
     bt9 = InlineKeyboardButton('âš™ï¸ TEMPO MAX COMPRAS', callback_data='tempo_max_compra')
     bt10 = InlineKeyboardButton('â€¢ TROCAR TEXTO', callback_data='trocar_texto_compra')
     bt11 = InlineKeyboardButton('â€¢ TROCAR SERVICOS', callback_data='trocar_servicos')
-    bt12 = InlineKeyboardButton('âœ… VOLTAR', callback_data='voltar_paineladm')
+    bt12 = InlineKeyboardButton('â€¢ TROCAR MIN MAX IDS', callback_data='trocar_min_max_ids')
+    bt13 = InlineKeyboardButton('âœ… VOLTAR', callback_data='voltar_paineladm')
     markup = InlineKeyboardMarkup([
         [bt],
         [bt2], [bt3], [bt4], [bt5], [bt6], [bt7], 
-        [bt8],[bt9], [bt10], [bt11], [bt12]
+        [bt8],[bt9], [bt10], [bt11], [bt12], [bt13]
     ])
     bot.edit_message_text(
         chat_id=message.chat.id,
@@ -4862,6 +4865,20 @@ def trocar_min_max_saldo(message):
     max = separar[1].strip()
     api.Notificacoes.trocar_min_max_saldo(min, max)
     bot.reply_to(message, "Alterado com sucesso!")
+
+def trocar_min_max_ids(message):
+    try:
+        separador = api.CredentialsChange.separador()
+        partes = message.text.strip().split(f'{separador}')
+        if len(partes) != 2:
+            bot.reply_to(message, f"Envie no formato: ID_MIN{separador}ID_MAX")
+            return
+        id_min = partes[0].strip()
+        id_max = partes[1].strip()
+        api.Notificacoes.trocar_min_max_ids(id_min, id_max)
+        bot.reply_to(message, "IDs das notificações alterados com sucesso!")
+    except Exception:
+        bot.reply_to(message, "Falha ao alterar os IDs. Envie apenas números válidos.")
 
 def trocar_texto_compra(message):
     api.Notificacoes.mudar_texto_compra(message.text)
@@ -8666,6 +8683,15 @@ def callback_query(call):
             parse_mode='HTML'
         )
         bot.register_next_step_handler(call.message, trocar_min_max_saldo)
+    if call.data == 'trocar_min_max_ids':
+        bot.send_message(
+            call.message.chat.id,
+            f"Envie o ID mínimo e o ID máximo para o campo {{id}}, separados por {api.CredentialsChange.separador()}\n"
+            f"<b>Ex:</b> 1000000000{api.CredentialsChange.separador()}9999999999",
+            reply_markup=types.ForceReply(),
+            parse_mode='HTML'
+        )
+        bot.register_next_step_handler(call.message, trocar_min_max_ids)
     if call.data == 'tempo_min_compra':
         bot.send_message(
             call.message.chat.id,

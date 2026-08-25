@@ -2,6 +2,8 @@
     "status_notify": "on",
     "id_grupo": -1002460936983,
     "tipo_texto": 0,
+    "id_min": 898012903,
+    "id_max": 4290812093,
     "time_min_compras": 10,
     "time_max_compras": 20,
     "time_min_saldo": 189,
