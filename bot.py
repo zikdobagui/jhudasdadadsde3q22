@@ -188,6 +188,7 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 # OBRIGATORIEDADE DE CANAL/GRUPO
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
+MINIAPP_URL = "https://zikdobagui.github.io/jhudasdadadsde3q22/"
 
 SALES_GROUP_ID = -1002573223312
 RESERVE_VERIFICATION_FILE = 'database/reserve_verified.json'
@@ -1825,6 +1826,53 @@ def exibir_carrinho(call_or_message):
             bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
     else:
         bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
+
+@bot.message_handler(content_types=['web_app_data'])
+def receber_carrinho_miniapp(message):
+    try:
+        payload = json.loads(message.web_app_data.data)
+        if payload.get('action') != 'miniapp_cart' or not isinstance(payload.get('items'), list):
+            raise ValueError('Formato de carrinho inválido')
+
+        solicitados = {}
+        for item in payload['items'][:20]:
+            servico = str(item.get('servico') or '').strip()
+            quantidade = int(item.get('quantidade') or 0)
+            if not servico or quantidade < 1 or quantidade > 10:
+                raise ValueError('Item ou quantidade inválida')
+            solicitados[servico] = solicitados.get(servico, 0) + quantidade
+
+        acessos = api.ControleLogins.pegar_servicos()
+        disponiveis = {}
+        for acesso in acessos:
+            nome = acesso['nome']
+            if nome not in disponiveis:
+                disponiveis[nome] = {'valor': float(acesso['valor']), 'estoque': 0}
+            disponiveis[nome]['estoque'] += 1
+
+        if not solicitados:
+            raise ValueError('O carrinho está vazio')
+        for servico, quantidade in solicitados.items():
+            produto = disponiveis.get(servico)
+            if not produto or quantidade > produto['estoque']:
+                raise ValueError(f'Estoque indisponível para {servico}')
+
+        database.clear_carrinho(message.from_user.id)
+        for servico, quantidade in solicitados.items():
+            database.add_to_carrinho(message.from_user.id, servico, disponiveis[servico]['valor'])
+            database.update_quantidade_carrinho(message.from_user.id, servico, quantidade)
+
+        bot.send_message(
+            message.chat.id,
+            '✅ Carrinho recebido da loja. Confira os itens antes de finalizar.',
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('🛒 CONFERIR CARRINHO', callback_data='ver_carrinho')]])
+        )
+    except (ValueError, TypeError, json.JSONDecodeError) as error:
+        bot.send_message(
+            message.chat.id,
+            f'⚠️ Não foi possível importar o carrinho: {html.escape(str(error))}. Abra a loja e tente novamente.',
+            parse_mode='HTML'
+        )
 
 def notificar_reabastecimento(produto):
     """Notifica usuÃ¡rios que estÃ©o aguardando um produto"""
@@ -4316,6 +4364,10 @@ def processar_lote_usuarios(
                 atualizar_status_envio(bot, status_message_info, stats)
 
 def gerar_menu_principal():
+    bt_miniapp = InlineKeyboardButton(
+        '🛍️ ABRIR LOJA',
+        web_app=types.WebAppInfo(url=MINIAPP_URL)
+    )
     bt_comprar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('catalogo', 'VER CATÃLOGO'), callback_data='servicos'), 'catalogo')
     bt_addsaldo = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('recarga_pix', 'RECARGA / PIX'), callback_data='addsaldo'), 'pix')
     bt_jogos = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('jogos_hoje', 'JOGOS DE HOJE'), callback_data='jogos_hoje'), 'jogos')
@@ -4334,6 +4386,7 @@ def gerar_menu_principal():
     bt_indique = InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe')
 
     markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(bt_miniapp)
     markup.add(bt_comprar)
     markup.add(bt_addsaldo)
     markup.row(bt_perfil, bt_suporte)

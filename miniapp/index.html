@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f8f7">
+  <title>Ramon Store</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>RAMON STORE</strong>
+      <span>Catálogo digital</span>
+    </div>
+    <button class="cart-button" id="cartButton" type="button" aria-label="Abrir carrinho">
+      <span aria-hidden="true">🛒</span>
+      <b id="cartCount">0</b>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="heroTitle">
+      <img src="assets/store-banner.png" alt="Celular, controle remoto e cartões digitais">
+      <div class="hero-copy">
+        <p>ENTREGA PELO BOT</p>
+        <h1 id="heroTitle">Escolha. Adicione. Finalize.</h1>
+        <span>Seu saldo e o estoque serão confirmados antes da compra.</span>
+      </div>
+    </section>
+
+    <section class="tools" aria-label="Filtros do catálogo">
+      <label class="search">
+        <span aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" placeholder="Buscar produto" autocomplete="off">
+      </label>
+      <div class="segments" id="segments">
+        <button class="active" data-filter="todos" type="button">Todos</button>
+        <button data-filter="conta" type="button">Contas</button>
+        <button data-filter="tela" type="button">Telas</button>
+        <button data-filter="outros" type="button">Outros</button>
+      </div>
+    </section>
+
+    <section class="catalog-heading">
+      <div>
+        <h2>Produtos disponíveis</h2>
+        <p id="resultCount"></p>
+      </div>
+      <span class="secure">✓ Compra verificada</span>
+    </section>
+
+    <section class="product-list" id="productList" aria-live="polite"></section>
+  </main>
+
+  <aside class="cart-sheet" id="cartSheet" aria-hidden="true">
+    <button class="scrim" id="closeCart" type="button" aria-label="Fechar carrinho"></button>
+    <section class="sheet-panel" aria-labelledby="cartTitle">
+      <div class="sheet-handle"></div>
+      <header>
+        <div>
+          <p>SEU PEDIDO</p>
+          <h2 id="cartTitle">Carrinho</h2>
+        </div>
+        <button class="icon-button" id="closeCartIcon" type="button" aria-label="Fechar">×</button>
+      </header>
+      <div class="cart-items" id="cartItems"></div>
+      <footer>
+        <div class="total"><span>Total estimado</span><strong id="cartTotal">R$ 0,00</strong></div>
+        <button class="checkout" id="checkoutButton" type="button">Enviar carrinho ao bot</button>
+        <p>Preço, saldo e disponibilidade serão validados no Telegram.</p>
+      </footer>
+    </section>
+  </aside>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
