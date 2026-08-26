@@ -1342,37 +1342,8 @@ def cmd_icone_upload(message):
 @bot.message_handler(content_types=['photo', 'document'])
 def receber_icone_upload(message):
     user_id = message.from_user.id
-    if user_id in pending_miniapp_image and pending_miniapp_image[user_id].get('mode') == 'upload':
-        state = pending_miniapp_image.pop(user_id)
-        produto = state['produto']
-        base_name = _normalize_key(produto) or 'produto'
-        file_ext = '.jpg'
-        try:
-            if message.content_type == 'photo':
-                file_info = bot.get_file(message.photo[-1].file_id)
-                file_bytes = bot.download_file(file_info.file_path)
-                file_ext = '.jpg'
-            else:
-                doc = message.document
-                if doc.file_name and '.' in doc.file_name:
-                    _, ext = os.path.splitext(doc.file_name)
-                    if ext.lower() in ('.jpg', '.jpeg', '.png', '.webp'):
-                        file_ext = ext.lower()
-                file_info = bot.get_file(doc.file_id)
-                file_bytes = bot.download_file(file_info.file_path)
-            os.makedirs(MINIAPP_SERVICE_IMAGES_DIR, exist_ok=True)
-            filename = f'{base_name}{file_ext}'
-            path = os.path.join(MINIAPP_SERVICE_IMAGES_DIR, filename)
-            with open(path, 'wb') as f:
-                f.write(file_bytes)
-            image_map = _load_miniapp_images()
-            image_map[produto] = f'assets/service-images/{filename}'
-            _save_miniapp_images(image_map)
-            atualizar_catalogo_miniapp()
-            ok, detalhe = publicar_miniapp_no_git(f'imagem {produto}')
-            bot.reply_to(message, f'✅ Imagem salva.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
-        except Exception as e:
-            bot.reply_to(message, f'Erro ao salvar imagem da Mini App: {e}')
+    if user_id in pending_miniapp_image:
+        salvar_upload_imagem_miniapp(message)
         return
 
     if user_id not in pending_icon_upload:
@@ -2439,7 +2410,14 @@ def configuracoes_geral(message):
 # =====================
 def _admin_only(message_or_call) -> bool:
     chat_id = message_or_call.chat.id if hasattr(message_or_call, 'chat') else message_or_call.message.chat.id
-    return api.Admin.verificar_admin(chat_id) or int(chat_id) == int(api.CredentialsChange.id_dono())
+    from_user = getattr(message_or_call, 'from_user', None)
+    user_id = getattr(from_user, 'id', chat_id)
+    return (
+        api.Admin.verificar_admin(chat_id)
+        or api.Admin.verificar_admin(user_id)
+        or int(chat_id) == int(api.CredentialsChange.id_dono())
+        or int(user_id) == int(api.CredentialsChange.id_dono())
+    )
 
 ROLETA_CONFIG_PATH = 'settings/roleta.json'
 ROLETA_GIROS_PATH = 'database/roleta_giros.json'
@@ -4436,6 +4414,9 @@ def salvar_link_imagem_miniapp(message):
     if not _admin_only(message):
         bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
         return
+    if getattr(message, 'content_type', '') in ('photo', 'document'):
+        salvar_upload_imagem_miniapp(message)
+        return
     state = pending_miniapp_image.pop(message.from_user.id, None)
     if not state or state.get('mode') != 'link':
         return
@@ -4452,11 +4433,60 @@ def salvar_link_imagem_miniapp(message):
 
 def pedir_upload_imagem_miniapp(message, produto):
     pending_miniapp_image[message.from_user.id] = {'mode': 'upload', 'produto': produto}
-    bot.send_message(
+    msg = bot.send_message(
         message.chat.id,
         f'Agora envie a foto ou documento de imagem para:\n<code>{html.escape(produto)}</code>',
         parse_mode='HTML'
     )
+    bot.register_next_step_handler(msg, salvar_upload_imagem_miniapp)
+
+def salvar_upload_imagem_miniapp(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
+        return
+    state = pending_miniapp_image.pop(message.from_user.id, None)
+    if not state:
+        bot.reply_to(message, 'Nenhuma imagem da Mini App estava aguardando upload. Abra o painel e tente novamente.')
+        return
+    if message.content_type not in ('photo', 'document'):
+        pending_miniapp_image[message.from_user.id] = state
+        bot.reply_to(message, 'Envie uma foto ou um documento de imagem.')
+        return
+
+    produto = state['produto']
+    base_name = _normalize_key(produto) or 'produto'
+    file_ext = '.jpg'
+    try:
+        if message.content_type == 'photo':
+            file_info = bot.get_file(message.photo[-1].file_id)
+            file_bytes = bot.download_file(file_info.file_path)
+            file_ext = '.jpg'
+        else:
+            doc = message.document
+            if doc.mime_type and not str(doc.mime_type).startswith('image/'):
+                pending_miniapp_image[message.from_user.id] = state
+                bot.reply_to(message, 'Esse documento não parece ser uma imagem. Envie JPG, PNG ou WEBP.')
+                return
+            if doc.file_name and '.' in doc.file_name:
+                _, ext = os.path.splitext(doc.file_name)
+                if ext.lower() in ('.jpg', '.jpeg', '.png', '.webp'):
+                    file_ext = ext.lower()
+            file_info = bot.get_file(doc.file_id)
+            file_bytes = bot.download_file(file_info.file_path)
+
+        os.makedirs(MINIAPP_SERVICE_IMAGES_DIR, exist_ok=True)
+        filename = f'{base_name}{file_ext}'
+        path = os.path.join(MINIAPP_SERVICE_IMAGES_DIR, filename)
+        with open(path, 'wb') as f:
+            f.write(file_bytes)
+        image_map = _load_miniapp_images()
+        image_map[produto] = f'assets/service-images/{filename}'
+        _save_miniapp_images(image_map)
+        atualizar_catalogo_miniapp()
+        ok, detalhe = publicar_miniapp_no_git(f'imagem {produto}')
+        bot.reply_to(message, f'✅ Imagem salva.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
+    except Exception as e:
+        bot.reply_to(message, f'Erro ao salvar imagem da Mini App: {e}')
     bt = InlineKeyboardButton('Sistema de Indicação: OFF', callback_data='mudar_status_afiliados')
     if api.AfiliadosInfo.status_afiliado() == True:
         bt = InlineKeyboardButton('Sistema de Indicação: ON', callback_data='mudar_status_afiliados')
