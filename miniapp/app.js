@@ -156,11 +156,50 @@ checkout.addEventListener('click', () => {
   window.setTimeout(() => tg?.close?.(), 500);
 });
 
-fetch(`catalog.json?v=${Date.now()}`, { cache: 'no-store' })
+fetch(`https://raw.githubusercontent.com/zikdobagui/jhudasdadadsde3q22/main/database/acessos.json?v=${Date.now()}`, { cache: 'no-store' })
   .then((response) => response.json())
-  .then((products) => {
-    state.products = products;
+  .then((data) => {
+    // Processa acessos.json diretamente
+    const acessos = data.acessos || data;
+    
+    // Agrupa por produto e conta estoque
+    const agrupados = {};
+    for (const acesso of acessos) {
+      const nome = acesso.nome;
+      if (!agrupados[nome]) {
+        agrupados[nome] = {
+          name: nome,
+          price: parseFloat(acesso.valor),
+          stock: 0
+        };
+      }
+      agrupados[nome].stock += 1;
+    }
+    
+    // Converte para array e carrega imagens
+    state.products = Object.values(agrupados).sort((a, b) => 
+      a.name.localeCompare(b.name, 'pt-BR')
+    );
+    
+    // Carrega mapeamento de imagens
+    return fetch(`https://raw.githubusercontent.com/zikdobagui/jhudasdadadsde3q22/main/database/miniapp_images.json?v=${Date.now()}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .catch(() => ({}));
+  })
+  .then((imageMap) => {
+    // Aplica imagens aos produtos
+    const timestamp = Math.floor(Date.now() / 1000);
+    for (const produto of state.products) {
+      const imagePath = imageMap[produto.name];
+      if (imagePath) {
+        produto.image = imagePath;
+        produto.updated_at = timestamp;
+      }
+    }
+    
     renderProducts();
     updateCart();
   })
-  .catch(() => { list.innerHTML = '<div class="empty">Não foi possível carregar o catálogo.</div>'; });
+  .catch(() => { 
+    list.innerHTML = '<div class="empty">Não foi possível carregar o catálogo.</div>'; 
+  });

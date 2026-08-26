@@ -16,6 +16,8 @@ backups/
 historicos/
 database/*
 !database/.gitkeep
+!database/miniapp_images.json
+!database/acessos.json
 tmp_streaming_emojis/
 database/*.db
 database/*.sqlite
