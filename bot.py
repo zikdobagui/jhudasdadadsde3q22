@@ -2245,22 +2245,41 @@ def notificar_reabastecimento(produto):
     
     return notificados
 
-def notificar_novos_logins(produto, quantidade):
+def notificar_abastecimento_estoque(abastecidos):
+    """Publica um aviso único no canal após abastecer um ou mais serviços."""
+    if not abastecidos:
+        return False
+
     try:
-        estoque_atual = api.ControleLogins.pegar_estoque(produto)
-        bag = custom_emoji("5229064374403998351", "ðŸ›")
-        chart = custom_emoji("5231200819986047254", "ðŸ“Š")
-        check = custom_emoji("5350486389806868244", "âœ…")
+        linhas = []
+        for produto, quantidade in abastecidos.items():
+            estoque_atual = api.ControleLogins.pegar_estoque(produto)
+            linhas.append(
+                f'🟢 <b>{html.escape(str(produto))}</b> — '
+                f'+{int(quantidade)} unidade(s) | '
+                f'<b>total: {int(estoque_atual)}</b>'
+            )
+
         texto = (
-            f"{bag} <b>ESTOQUE REABASTECIDO</b>\n\n"
-            f"â€¢ <b>ServiÃ§o:</b> <code>{html.escape(str(produto))}</code>\n"
-            f"â€¢ <b>Quantidade adicionada:</b> <code>{int(quantidade)}</code>\n"
-            f"â€¢ <b>Estoque atual:</b> <code>{int(estoque_atual)}</code>\n\n"
-            f"{chart} O catÃ¡logo jÃ¡ foi atualizado. {check}"
+            '📦 <b>ESTOQUE REABASTECIDO!</b>\n\n'
+            '✅ Novos produtos já estão disponíveis na loja:\n\n'
+            + '\n'.join(linhas)
+            + '\n\n🛒 <i>Acesse a loja e garanta o seu!</i>'
         )
-        bot.send_message(get_sales_notification_chat_id(), texto, parse_mode='HTML')
-    except Exception as e:
-        print(f"[ESTOQUE] Erro ao avisar reabastecimento no canal: {e}")
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton('🛒 ABRIR LOJA', url=MINIAPP_URL))
+        bot.send_message(
+            get_sales_notification_chat_id(),
+            texto,
+            parse_mode='HTML',
+            reply_markup=markup,
+            disable_web_page_preview=True
+        )
+        return True
+    except Exception as error:
+        print(f'[ESTOQUE] Erro ao avisar reabastecimento no canal: {error}', flush=True)
+        return False
+
 
 def exibir_editar_carrinho(call):
     """Exibe o carrinho com opÃ§Ãµes de ediÃ§Ã£o"""
@@ -4171,8 +4190,7 @@ def adicionar_login(message):
         except Exception as e:
             print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
 
-    for prod, qtd in notificacoes.items():
-        notificar_novos_logins(prod, qtd)
+    notificar_abastecimento_estoque(notificacoes)
 
 @bot.message_handler(func=lambda message: adding_logins.get(message.from_user.id, False) and not message.text.startswith('/'))
 def receber_logins(message):
