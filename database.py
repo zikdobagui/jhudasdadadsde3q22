@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 # Diretório onde os dados dos usuários serão armazenados
 USER_DATA_DIR = 'database/users'
+os.makedirs(USER_DATA_DIR, exist_ok=True)
 
 # Função para salvar os dados do usuário em arquivos separados
 def save_user_data(user_id, user_data):

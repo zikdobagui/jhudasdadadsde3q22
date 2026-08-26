@@ -1924,6 +1924,9 @@ def carregar_catalogo_miniapp():
 
 def _load_miniapp_images():
     try:
+        if not os.path.exists(MINIAPP_IMAGES_FILE):
+            _save_miniapp_images({})
+            return {}
         with open(MINIAPP_IMAGES_FILE, 'r', encoding='utf-8') as f:
             data = json.load(f)
         if isinstance(data, dict):
@@ -2528,6 +2531,9 @@ ROLETA_GIROS_PATH = 'database/roleta_giros.json'
 
 def _read_json_file(path, default):
     try:
+        if not os.path.exists(path):
+            _write_json_file(path, default)
+            return default.copy() if isinstance(default, dict) else default
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -3785,6 +3791,9 @@ CUSTOM_DESC_FILE = 'database/custom_descriptions.json'
 def _load_custom_descriptions():
     """Carrega as descriÃ§Ãµes personalizadas do arquivo JSON"""
     try:
+        if not os.path.exists(CUSTOM_DESC_FILE):
+            _save_custom_descriptions({"descriptions": {}})
+            return {"descriptions": {}}
         with open(CUSTOM_DESC_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):

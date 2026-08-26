@@ -14,7 +14,30 @@ from database import load_user_data, save_user_data
 from pytz import timezone
 from utils import hc, virtualPayToken, datauser
 
+DEFAULT_DATABASE_FILES = {
+    'database/admins.json': {"admins": []},
+    'database/acessos.json': {"acessos": []},
+    'database/gift_card.json': {"gift": []},
+    'database/info_transmitir.json': {"texto": None, "photo": None, "markup": None},
+    'database/custom_descriptions.json': {"descriptions": {}},
+    'database/reserve_verified.json': {},
+    'database/users.json': {"users": []},
+}
+
+os.makedirs('database/users', exist_ok=True)
+
+def ensure_default_database_file(filepath):
+    normalized = filepath.replace('\\', '/')
+    default = DEFAULT_DATABASE_FILES.get(normalized)
+    if default is None or os.path.exists(filepath):
+        return
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(default, f, indent=4, ensure_ascii=False)
+
 def open_utf8(filepath, mode='r'):
+    if 'r' in mode and '+' not in mode:
+        ensure_default_database_file(filepath)
     return open(filepath, mode, encoding='utf-8')
 
 class ViewTime():
@@ -1428,7 +1451,7 @@ class Textos():
         # Verificar se existe descrição personalizada (por nome exato do produto)
         try:
             import json
-            with open('database/custom_descriptions.json', 'r', encoding='utf-8') as f:
+            with open_utf8('database/custom_descriptions.json', 'r') as f:
                 custom_data = json.load(f)
             custom_desc = custom_data.get('descriptions', {}).get(nome_servico)
             if custom_desc:
