@@ -681,10 +681,18 @@ def reserve_verification_text():
 
 def send_reserve_verification(chat_id):
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton('ðŸ‘¥ Entrar no Grupo Reserva', url=reserve_group_url()))
-    markup.row(InlineKeyboardButton('ðŸ›¡ï¸ Iniciar Bot Reserva', url=reserve_bot_url()))
-    markup.row(InlineKeyboardButton('âœ… JÃ¡ verifiquei, continuar', callback_data='reserve_verified_continue'))
-    bot.send_message(chat_id, reserve_verification_text(), parse_mode='HTML', reply_markup=markup)
+    markup.row(InlineKeyboardButton('👥 Entrar no Grupo Reserva', url=reserve_group_url()))
+    markup.row(InlineKeyboardButton('🛡️ Iniciar Bot Reserva', url=reserve_bot_url()))
+    markup.row(InlineKeyboardButton('✅ Já verifiquei, continuar', callback_data='reserve_verified_continue'))
+    try:
+        bot.send_message(chat_id, reserve_verification_text(), parse_mode='HTML', reply_markup=markup)
+    except ApiTelegramException as error:
+        error_text = str(error).lower()
+        if 'bot was blocked by the user' in error_text or 'user is deactivated' in error_text or 'chat not found' in error_text:
+            print(f'[RESERVA] Usuário {chat_id} não pode receber mensagens ({error}).', flush=True)
+            return False
+        raise
+    return True
 
 def set_streaming_button_icon(button, index: int):
     emoji_id = service_emoji_id_at(index)
@@ -1315,8 +1323,12 @@ def enviar_backup_automatico_aos_admins(backup_path):
                         parse_mode='HTML'
                     )
                     enviado = True
-            except Exception as error:
-                print(f'[BACKUP] Falha ao enviar para o admin {admin_id}: {error}', flush=True)
+            except ApiTelegramException as error:
+                error_text = str(error).lower()
+                if 'bot was blocked by the user' in error_text or 'user is deactivated' in error_text or 'chat not found' in error_text:
+                    print(f'[BACKUP] Admin {admin_id} não pode receber o backup; ignorando.', flush=True)
+                else:
+                    print(f'[BACKUP] Falha ao enviar para o admin {admin_id}: {error}', flush=True)
     finally:
         try:
             if backup_path and os.path.exists(backup_path):
@@ -4544,6 +4556,28 @@ def configurar_afiliados(message):
         f'Quando um cliente entra pelo link de indicação e faz uma recarga, '
         f'quem indicou recebe essa porcentagem direto no saldo automaticamente.'
     )
+    botao_status = InlineKeyboardButton(
+        f'Sistema de Indicação: {status}',
+        callback_data='mudar_status_afiliados'
+    )
+    markup = InlineKeyboardMarkup([
+        [botao_status],
+        [InlineKeyboardButton('Alterar Comissão %', callback_data='pontos_por_recarga')],
+        [InlineKeyboardButton('VOLTAR', callback_data='voltar_paineladm')]
+    ])
+    try:
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except ApiTelegramException as error:
+        if 'message is not modified' not in str(error).lower():
+            bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
 
 def mostrar_menu_miniapp_imagens(message):
     if not _admin_only(message):
@@ -4702,19 +4736,6 @@ def salvar_upload_imagem_miniapp(message):
         bot.reply_to(message, resposta, parse_mode='HTML')
     except Exception as e:
         bot.reply_to(message, f'Erro ao salvar imagem da Mini App: {e}')
-    bt = InlineKeyboardButton('Sistema de Indicação: OFF', callback_data='mudar_status_afiliados')
-    if api.AfiliadosInfo.status_afiliado() == True:
-        bt = InlineKeyboardButton('Sistema de Indicação: ON', callback_data='mudar_status_afiliados')
-    bt2 = InlineKeyboardButton('Alterar Comissão %', callback_data='pontos_por_recarga')
-    bt5 = InlineKeyboardButton('VOLTAR', callback_data='voltar_paineladm')
-    markup = InlineKeyboardMarkup([[bt], [bt2], [bt5]])
-    bot.edit_message_text(
-        chat_id=message.chat.id,
-        message_id=message.message_id,
-        text=texto,
-        parse_mode='HTML',
-        reply_markup=markup
-    )
 
 def pontos_por_recarga(message):
     try:
@@ -9453,14 +9474,21 @@ def callback_query(call):
 
     # =============== ConfiguraÃ§Ãµes dos afiliados
     if call.data == 'configurar_afiliados':
-        configurar_afiliados(call.message)
+        try:
+            configurar_afiliados(call.message)
+            bot.answer_callback_query(call.id)
+        except Exception as error:
+            print(f'[AFILIADOS] Erro ao abrir configuração: {error}')
+            bot.answer_callback_query(call.id, 'Não foi possível abrir agora.', show_alert=True)
+        return
     if call.data == 'mudar_status_afiliados':
         try:
             api.AfiliadosInfo.mudar_status_afiliado()
             bot.answer_callback_query(call.id, "Status alterado com sucesso!", show_alert=True)
             configurar_afiliados(call.message)
-        except:
+        except Exception:
             bot.answer_callback_query(call.id, "Falha ao mudar o status.", show_alert=True)
+        return
     if call.data == 'pontos_por_recarga':
         bot.send_message(
             call.message.chat.id,
