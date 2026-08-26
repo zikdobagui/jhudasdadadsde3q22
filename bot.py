@@ -189,6 +189,8 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
 MINIAPP_URL = "https://zikdobagui.github.io/jhudasdadadsde3q22/"
+MINIAPP_IMAGES_FILE = os.path.join('database', 'miniapp_images.json')
+MINIAPP_SERVICE_IMAGES_DIR = os.path.join('miniapp', 'assets', 'service-images')
 
 SALES_GROUP_ID = -1002573223312
 RESERVE_VERIFICATION_FILE = 'database/reserve_verified.json'
@@ -265,6 +267,7 @@ def set_sales_notification_chat_id(chat_id):
 
 # Estado para upload de Ã­cones de serviÃ§os
 pending_icon_upload = {}
+pending_miniapp_image = {}
 # Estado para ediÃ§Ã£o de textos (arquivo -> aguardando novo conteÃ©do)
 pending_text_edit = {}
 pending_button_edit = {}
@@ -1339,6 +1342,39 @@ def cmd_icone_upload(message):
 @bot.message_handler(content_types=['photo', 'document'])
 def receber_icone_upload(message):
     user_id = message.from_user.id
+    if user_id in pending_miniapp_image and pending_miniapp_image[user_id].get('mode') == 'upload':
+        state = pending_miniapp_image.pop(user_id)
+        produto = state['produto']
+        base_name = _normalize_key(produto) or 'produto'
+        file_ext = '.jpg'
+        try:
+            if message.content_type == 'photo':
+                file_info = bot.get_file(message.photo[-1].file_id)
+                file_bytes = bot.download_file(file_info.file_path)
+                file_ext = '.jpg'
+            else:
+                doc = message.document
+                if doc.file_name and '.' in doc.file_name:
+                    _, ext = os.path.splitext(doc.file_name)
+                    if ext.lower() in ('.jpg', '.jpeg', '.png', '.webp'):
+                        file_ext = ext.lower()
+                file_info = bot.get_file(doc.file_id)
+                file_bytes = bot.download_file(file_info.file_path)
+            os.makedirs(MINIAPP_SERVICE_IMAGES_DIR, exist_ok=True)
+            filename = f'{base_name}{file_ext}'
+            path = os.path.join(MINIAPP_SERVICE_IMAGES_DIR, filename)
+            with open(path, 'wb') as f:
+                f.write(file_bytes)
+            image_map = _load_miniapp_images()
+            image_map[produto] = f'assets/service-images/{filename}'
+            _save_miniapp_images(image_map)
+            atualizar_catalogo_miniapp()
+            ok, detalhe = publicar_miniapp_no_git(f'imagem {produto}')
+            bot.reply_to(message, f'✅ Imagem salva.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
+        except Exception as e:
+            bot.reply_to(message, f'Erro ao salvar imagem da Mini App: {e}')
+        return
+
     if user_id not in pending_icon_upload:
         return  # nÃ£o Ã© upload de Ã­cone esperado
 
@@ -1883,6 +1919,86 @@ def carregar_catalogo_miniapp():
     except Exception:
         pass
     return []
+
+def _load_miniapp_images():
+    try:
+        with open(MINIAPP_IMAGES_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+def _save_miniapp_images(data):
+    os.makedirs(os.path.dirname(MINIAPP_IMAGES_FILE), exist_ok=True)
+    with open(MINIAPP_IMAGES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def _miniapp_image_for_service(nome, image_map=None):
+    image_map = image_map if image_map is not None else _load_miniapp_images()
+    exact = image_map.get(nome)
+    if exact:
+        return exact
+    nome_key = _normalize_key(nome)
+    for key, value in image_map.items():
+        key_norm = _normalize_key(key)
+        if key_norm and (key_norm in nome_key or nome_key in key_norm):
+            return value
+    return ''
+
+def atualizar_catalogo_miniapp():
+    image_map = _load_miniapp_images()
+    agrupados = {}
+    for acesso in api.ControleLogins.pegar_servicos():
+        nome = acesso['nome']
+        if nome not in agrupados:
+            agrupados[nome] = {
+                'name': nome,
+                'price': float(acesso['valor']),
+                'stock': 0
+            }
+        agrupados[nome]['stock'] += 1
+
+    catalogo = []
+    for produto in sorted(agrupados.values(), key=lambda item: _normalize_key(item['name'])):
+        image = _miniapp_image_for_service(produto['name'], image_map)
+        if image:
+            produto['image'] = image
+        catalogo.append(produto)
+
+    os.makedirs('miniapp', exist_ok=True)
+    with open(os.path.join('miniapp', 'catalog.json'), 'w', encoding='utf-8') as f:
+        json.dump(catalogo, f, indent=2, ensure_ascii=False)
+    return catalogo
+
+def publicar_miniapp_no_git(motivo):
+    try:
+        paths = [
+            path for path in ('miniapp/catalog.json', MINIAPP_SERVICE_IMAGES_DIR, MINIAPP_IMAGES_FILE)
+            if os.path.exists(path)
+        ]
+        if paths:
+            subprocess.run(['git', 'add', *paths], check=False)
+        status = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True, check=False)
+        if not status.stdout.strip():
+            return True, 'Nenhuma mudança nova para publicar.'
+        commit_msg = f'Update Mini App service images: {motivo}'[:120]
+        commit = subprocess.run(['git', 'commit', '-m', commit_msg], capture_output=True, text=True, check=False)
+        if commit.returncode != 0:
+            return False, (commit.stderr or commit.stdout or 'Falha ao criar commit.').strip()
+        push = subprocess.run(['git', 'push', 'origin', 'main'], capture_output=True, text=True, check=False)
+        if push.returncode != 0:
+            return False, (push.stderr or push.stdout or 'Falha ao enviar para o Git.').strip()
+        return True, 'Publicado no GitHub. O GitHub Pages vai atualizar em instantes.'
+    except Exception as e:
+        return False, str(e)
+
+def _miniapp_product_by_index(index):
+    produtos = _get_unique_products()
+    if 0 <= index < len(produtos):
+        return produtos[index]
+    return ''
 
 def importar_carrinho_miniapp_start(message, payload):
     if len(payload or '') > 64 or not re.fullmatch(r'mc_(?:\d+x\d+)(?:_\d+x\d+)*', payload or ''):
@@ -3292,6 +3408,7 @@ def mostrar_menu_imagens(message):
         bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
         return
     markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('🖼️ Imagens da Mini App', callback_data='miniapp_images_menu'))
     markup.row(InlineKeyboardButton('â€¢ Listar Ã­cones', callback_data='icons_list'))
     markup.row(InlineKeyboardButton('â€¢ Adicionar/Atualizar Ã­cone', callback_data='icons_add'))
     markup.row(InlineKeyboardButton('â€¢ Remover Ã­cone', callback_data='icons_remove'))
@@ -4243,6 +4360,102 @@ def configurar_afiliados(message):
         f'<b>Comissão por recarga:</b> {percentual}%\n\n'
         f'Quando um cliente entra pelo link de indicação e faz uma recarga, '
         f'quem indicou recebe essa porcentagem direto no saldo automaticamente.'
+    )
+
+def mostrar_menu_miniapp_imagens(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
+        return
+    produtos = _get_unique_products()
+    image_map = _load_miniapp_images()
+    markup = InlineKeyboardMarkup()
+    rows = []
+    for idx, produto in enumerate(produtos):
+        status = '✅' if _miniapp_image_for_service(produto, image_map) else '▫️'
+        rows.append(InlineKeyboardButton(f'{status} {produto[:28]}', callback_data=f'miniimg_edit|{idx}'))
+        if len(rows) == 2:
+            markup.row(*rows)
+            rows = []
+    if rows:
+        markup.row(*rows)
+    markup.row(InlineKeyboardButton('🔄 Atualizar catálogo', callback_data='miniimg_refresh_catalog'))
+    markup.row(InlineKeyboardButton('✅ Voltar', callback_data='gerenciar_imagens'))
+    texto = (
+        '🖼️ <b>IMAGENS DA MINI APP</b>\n\n'
+        'Escolha o serviço e cadastre uma imagem por link ou enviando a foto/documento.\n'
+        'Essas imagens aparecem nos cards do site.'
+    )
+    try:
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_acoes_imagem_miniapp(message, produto):
+    image_url = _miniapp_image_for_service(produto)
+    preview = image_url or 'sem imagem'
+    markup = InlineKeyboardMarkup()
+    idx = _get_unique_products().index(produto) if produto in _get_unique_products() else -1
+    markup.row(InlineKeyboardButton('🔗 Usar link', callback_data=f'miniimg_link|{idx}'))
+    markup.row(InlineKeyboardButton('📤 Enviar imagem', callback_data=f'miniimg_upload|{idx}'))
+    if image_url:
+        markup.row(InlineKeyboardButton('🗑 Remover imagem', callback_data=f'miniimg_remove|{idx}'))
+    markup.row(InlineKeyboardButton('✅ Voltar', callback_data='miniapp_images_menu'))
+    texto = (
+        f'🖼️ <b>Imagem do serviço</b>\n\n'
+        f'<b>Serviço:</b> <code>{html.escape(produto)}</code>\n'
+        f'<b>Atual:</b> <code>{html.escape(preview)}</code>'
+    )
+    try:
+        bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message.message_id,
+            text=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def perguntar_link_imagem_miniapp(message, produto):
+    pending_miniapp_image[message.from_user.id] = {'mode': 'link', 'produto': produto}
+    bot.send_message(
+        message.chat.id,
+        f'Envie o link da imagem para:\n<code>{html.escape(produto)}</code>\n\nUse /cancelar para abortar.',
+        parse_mode='HTML',
+        reply_markup=types.ForceReply()
+    )
+    bot.register_next_step_handler(message, salvar_link_imagem_miniapp)
+
+def salvar_link_imagem_miniapp(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
+        return
+    state = pending_miniapp_image.pop(message.from_user.id, None)
+    if not state or state.get('mode') != 'link':
+        return
+    link = (message.text or '').strip()
+    if not re.match(r'^https?://', link):
+        bot.reply_to(message, 'Link inválido. Envie uma URL começando com http:// ou https://.')
+        return
+    image_map = _load_miniapp_images()
+    image_map[state['produto']] = link
+    _save_miniapp_images(image_map)
+    atualizar_catalogo_miniapp()
+    ok, detalhe = publicar_miniapp_no_git(f'imagem {state["produto"]}')
+    bot.reply_to(message, f'✅ Imagem salva por link.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
+
+def pedir_upload_imagem_miniapp(message, produto):
+    pending_miniapp_image[message.from_user.id] = {'mode': 'upload', 'produto': produto}
+    bot.send_message(
+        message.chat.id,
+        f'Agora envie a foto ou documento de imagem para:\n<code>{html.escape(produto)}</code>',
+        parse_mode='HTML'
     )
     bt = InlineKeyboardButton('Sistema de Indicação: OFF', callback_data='mudar_status_afiliados')
     if api.AfiliadosInfo.status_afiliado() == True:
@@ -7617,6 +7830,67 @@ def callback_query(call):
             bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
             return
         mostrar_menu_imagens(call.message)
+        return
+
+    if call.data == 'miniapp_images_menu':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        mostrar_menu_miniapp_imagens(call.message)
+        return
+
+    if call.data == 'miniimg_refresh_catalog':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        atualizar_catalogo_miniapp()
+        ok, detalhe = publicar_miniapp_no_git('catalogo')
+        bot.answer_callback_query(call.id, detalhe[:180], show_alert=True)
+        mostrar_menu_miniapp_imagens(call.message)
+        return
+
+    if call.data.startswith('miniimg_edit|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        produto = _miniapp_product_by_index(int(call.data.split('|', 1)[1]))
+        if not produto:
+            bot.answer_callback_query(call.id, 'Produto não encontrado.', show_alert=True)
+            return
+        mostrar_acoes_imagem_miniapp(call.message, produto)
+        return
+
+    if call.data.startswith('miniimg_link|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        produto = _miniapp_product_by_index(int(call.data.split('|', 1)[1]))
+        if produto:
+            perguntar_link_imagem_miniapp(call.message, produto)
+        return
+
+    if call.data.startswith('miniimg_upload|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        produto = _miniapp_product_by_index(int(call.data.split('|', 1)[1]))
+        if produto:
+            pedir_upload_imagem_miniapp(call.message, produto)
+        return
+
+    if call.data.startswith('miniimg_remove|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        produto = _miniapp_product_by_index(int(call.data.split('|', 1)[1]))
+        image_map = _load_miniapp_images()
+        if produto and produto in image_map:
+            image_map.pop(produto, None)
+            _save_miniapp_images(image_map)
+            atualizar_catalogo_miniapp()
+            ok, detalhe = publicar_miniapp_no_git(f'remover imagem {produto}')
+            bot.answer_callback_query(call.id, detalhe[:180], show_alert=True)
+        mostrar_menu_miniapp_imagens(call.message)
         return
 
     # Abrir menu de emojis premium por serviÃ§o

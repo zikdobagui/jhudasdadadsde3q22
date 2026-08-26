@@ -149,6 +149,15 @@ main { width: min(100%, 780px); margin: 0 auto; padding: 12px 14px 104px; }
   background: rgba(31, 191, 117, .12);
   font-size: 21px;
 }
+.product-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 8px;
+  background: #0b1119;
+}
 .product h3 { margin: 12px 0 6px; overflow-wrap: anywhere; font-size: 14px; line-height: 1.25; }
 .stock { margin: 0; color: var(--muted); font-size: 11px; }
 .product-bottom { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }

@@ -55,7 +55,9 @@ function renderProducts() {
   }
   list.innerHTML = products.map((product) => `
     <article class="product">
-      <div class="product-icon" aria-hidden="true">${iconFor(product.name)}</div>
+      ${product.image
+        ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(cleanName(product.name))}" loading="lazy">`
+        : `<div class="product-icon" aria-hidden="true">${iconFor(product.name)}</div>`}
       <h3>${escapeHtml(cleanName(product.name))}</h3>
       <p class="stock">${product.stock} unidade${product.stock === 1 ? '' : 's'} disponível${product.stock === 1 ? '' : 'is'}</p>
       <div class="product-bottom">
