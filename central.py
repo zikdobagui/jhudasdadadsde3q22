@@ -1032,11 +1032,11 @@ class ControleLogins():
         return None
 
   
-    def add_login(nome, valor, descricao, email, senha, duracao):
+    def add_login(nome, valor, descricao, email, senha, duracao, force=False):
         with ControleLogins._registry_lock:
             registro = ControleLogins._carregar_registro()
             chave = ControleLogins._normalizar_conta(nome, email)
-            if chave in registro['contas']:
+            if chave in registro['contas'] and not force:
                 return False
 
             with open_utf8('database/acessos.json', 'r') as f:

@@ -311,6 +311,7 @@ pending_service_emoji_remove = {}
 pending_description_edit = {}
 # Estado para adicionar quantidade ao carrinho
 pending_carrinho_qtd = {}
+pending_duplicate_logins = {}
 # Estado para adicionar notificaÃ§Ã£o de reabastecimento
 pending_notif_reabast = {}
 # Compras aguardando aceite dos termos antes de descontar saldo/entregar
@@ -4095,6 +4096,66 @@ def mudar_emojis_servicos(message, callid):
         parse_mode='HTML'
     )
 
+def perguntar_adicionar_logins_duplicados(chat_id, user_id, duplicados):
+    if not duplicados:
+        return
+
+    pending_duplicate_logins[user_id] = duplicados
+    preview = []
+    for item in duplicados[:10]:
+        preview.append(
+            f"• <b>{html.escape(str(item['nome']))}</b> - <code>{html.escape(str(item['email']))}</code>"
+        )
+    if len(duplicados) > 10:
+        preview.append(f"• ... e mais {len(duplicados) - 10} login(s)")
+
+    markup = InlineKeyboardMarkup()
+    markup.row(
+        InlineKeyboardButton('✅ Adicionar mesmo assim', callback_data='dup_login_add'),
+        InlineKeyboardButton('❌ Ignorar', callback_data='dup_login_skip')
+    )
+    bot.send_message(
+        chat_id,
+        (
+            f"⚠️ Encontrei <b>{len(duplicados)}</b> login(s) duplicado(s):\n\n"
+            + "\n".join(preview)
+            + "\n\nDeseja adicionar mesmo assim?"
+        ),
+        parse_mode='HTML',
+        reply_markup=markup
+    )
+
+def adicionar_logins_duplicados_confirmados(user_id):
+    duplicados = pending_duplicate_logins.pop(user_id, [])
+    adicionados = 0
+    notificacoes = {}
+
+    for item in duplicados:
+        try:
+            if api.ControleLogins.add_login(
+                nome=item['nome'],
+                valor=item['valor'],
+                descricao=item['descricao'],
+                email=item['email'],
+                senha=item['senha'],
+                duracao=item['duracao'],
+                force=True
+            ):
+                adicionados += 1
+                notificacoes[item['nome']] = notificacoes.get(item['nome'], 0) + 1
+        except Exception as e:
+            print(f"[LOGIN] Erro ao forcar login duplicado: {e}")
+
+    if adicionados > 0:
+        try:
+            atualizar_catalogo_miniapp()
+            publicar_miniapp_no_git('adicionar logins duplicados')
+        except Exception as e:
+            print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
+        notificar_abastecimento_estoque(notificacoes)
+
+    return adicionados
+
 @bot.message_handler(func=lambda message: '/addlogin' in message.text.split('===')[0])
 def adicionar_login(message):
     
@@ -4106,6 +4167,7 @@ def adicionar_login(message):
     separador = api.CredentialsChange.separador()
     quantity = 0
     notificacoes = {} 
+    duplicados_pendentes = []
 
     for ordem in sep:
         if len(ordem) > 0:
@@ -4128,7 +4190,14 @@ def adicionar_login(message):
                             duracao='30'
                         )
                         if not adicionado:
-                            bot.reply_to(message, f'Conta duplicada ignorada: <code>{html.escape(email)}</code> em <b>{html.escape(servico)}</b>.', parse_mode='HTML')
+                            duplicados_pendentes.append({
+                                'nome': servico,
+                                'valor': preco,
+                                'descricao': descricao,
+                                'email': email,
+                                'senha': senha,
+                                'duracao': '30'
+                            })
                             continue
                         quantity += 1
                         notificacoes[servico] = notificacoes.get(servico, 0) + 1
@@ -4172,7 +4241,14 @@ def adicionar_login(message):
                             duracao=duracao
                         )
                         if not adicionado:
-                            bot.reply_to(message, f'Conta duplicada ignorada: <code>{html.escape(email)}</code> em <b>{html.escape(servico)}</b>.', parse_mode='HTML')
+                            duplicados_pendentes.append({
+                                'nome': servico,
+                                'valor': valor,
+                                'descricao': descricao,
+                                'email': email,
+                                'senha': senha,
+                                'duracao': duracao
+                            })
                             continue
                         quantity += 1
                         notificacoes[servico] = notificacoes.get(servico, 0) + 1
@@ -4181,6 +4257,7 @@ def adicionar_login(message):
                 except:
                     bot.reply_to(message, "Erro ao adicionar, vocÃ© enviou em um formato nÃ£o permitido!")
     bot.reply_to(message, f"Feito! VocÃª abasteceu <b>{quantity}</b> login(s).", parse_mode='HTML')
+    perguntar_adicionar_logins_duplicados(message.chat.id, message.from_user.id, duplicados_pendentes)
 
     # Atualizar catálogo do miniapp após adicionar logins
     if quantity > 0:
@@ -7951,6 +8028,36 @@ def callback_cancelar_inline(call):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
 
+    if call.data == 'dup_login_add':
+        adicionados = adicionar_logins_duplicados_confirmados(call.from_user.id)
+        bot.answer_callback_query(call.id, "Duplicados adicionados.", show_alert=True)
+        try:
+            bot.edit_message_reply_markup(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=None
+            )
+        except Exception:
+            pass
+        bot.send_message(
+            call.message.chat.id,
+            f"✅ {adicionados} login(s) duplicado(s) adicionado(s) mesmo assim."
+        )
+        return
+
+    if call.data == 'dup_login_skip':
+        pending_duplicate_logins.pop(call.from_user.id, None)
+        bot.answer_callback_query(call.id, "Duplicados ignorados.", show_alert=True)
+        try:
+            bot.edit_message_reply_markup(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=None
+            )
+        except Exception:
+            pass
+        return
+
     if call.data == 'reserve_verified_continue':
         try:
             if not is_user_in_reserve_group(call.from_user.id):
@@ -10263,22 +10370,46 @@ def finalizar_adicao_logins(user_id):
             notificacoes = {}
             adicionados = 0
             duplicados = 0
+            invalidos = 0
+            duplicados_pendentes = []
+            separador = api.CredentialsChange.separador()
          
             for login in logins:
                 try:
-                    nome, valor, descricao, email, senha, duracao = login.split('/')
+                    partes = login.split(separador)
+                    if len(partes) != 6 and separador != '/':
+                        partes = login.split('/')
+                    if len(partes) != 6:
+                        raise ValueError
+                    nome, valor_texto, descricao, email, senha, duracao = [parte.strip() for parte in partes]
+                    valor = parse_valor_monetario(valor_texto)
                     if not api.ControleLogins.add_login(nome=nome, valor=valor, descricao=descricao, email=email, senha=senha, duracao=duracao):
                         duplicados += 1
+                        duplicados_pendentes.append({
+                            'nome': nome,
+                            'valor': valor,
+                            'descricao': descricao,
+                            'email': email,
+                            'senha': senha,
+                            'duracao': duracao
+                        })
                         continue
                     adicionados += 1
                     notificacoes[nome] = notificacoes.get(nome, 0) + 1
                 except ValueError:
+                    invalidos += 1
                     continue  
 
+            resumo = f"✅ Adição finalizada: {adicionados} login(s) adicionado(s)."
+            if duplicados:
+                resumo += f"\n⚠️ {duplicados} duplicado(s) aguardando sua confirmação."
+            if invalidos:
+                resumo += f"\n❌ {invalidos} linha(s) com valor ou formato inválido foram ignoradas."
             bot.send_message(
                 user_id,
-                f"✅ Adição finalizada: {adicionados} login(s) adicionado(s) e {duplicados} duplicado(s) ignorado(s)."
+                resumo
             )
+            perguntar_adicionar_logins_duplicados(user_id, user_id, duplicados_pendentes)
             for prod, qtd in notificacoes.items():
                 notificar_novos_logins(prod, qtd)
         else:
