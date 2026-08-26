@@ -23,6 +23,38 @@ DEFAULT_DATABASE_FILES = {
     'database/reserve_verified.json': {},
     'database/users.json': {"users": []},
 }
+DEFAULT_TEXT_FILES = {
+    'log/registro.txt': (
+        "👤 <b>NOVO USUÁRIO REGISTRADO</b>\n\n"
+        "• <b>ID:</b> <code>{id}</code>\n"
+        "• <b>Nome:</b> {name}\n"
+        "• <b>Username:</b> {username}\n"
+        "• <b>Perfil:</b> {link}"
+    ),
+    'log/compra.txt': (
+        "🛒 <b>NOVA COMPRA</b>\n\n"
+        "• <b>Cliente:</b> {name}\n"
+        "• <b>ID:</b> <code>{id}</code>\n"
+        "• <b>Username:</b> {username}\n"
+        "• <b>Serviço:</b> {servico}\n"
+        "• <b>Valor:</b> R${valor}\n"
+        "• <b>Saldo após compra:</b> R${saldo}\n"
+        "• <b>Data:</b> {data} às {hora}\n\n"
+        "• <b>Email/Login:</b> <code>{email}</code>\n"
+        "• <b>Senha:</b> <code>{senha}</code>\n"
+        "• <b>Descrição:</b> {descricao}"
+    ),
+    'log/recarga.txt': (
+        "💰 <b>NOVA RECARGA</b>\n\n"
+        "• <b>Cliente:</b> {name}\n"
+        "• <b>ID:</b> <code>{id}</code>\n"
+        "• <b>Username:</b> {username}\n"
+        "• <b>Pagamento:</b> <code>{id_pagamento}</code>\n"
+        "• <b>Valor:</b> R${valor}\n"
+        "• <b>Saldo atual:</b> R${saldo}\n"
+        "• <b>Data:</b> {data} às {hora}"
+    ),
+}
 
 os.makedirs('database/users', exist_ok=True)
 
@@ -35,9 +67,19 @@ def ensure_default_database_file(filepath):
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(default, f, indent=4, ensure_ascii=False)
 
+def ensure_default_text_file(filepath):
+    normalized = filepath.replace('\\', '/')
+    default = DEFAULT_TEXT_FILES.get(normalized)
+    if default is None or os.path.exists(filepath):
+        return
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(default)
+
 def open_utf8(filepath, mode='r'):
     if 'r' in mode and '+' not in mode:
         ensure_default_database_file(filepath)
+        ensure_default_text_file(filepath)
     return open(filepath, mode, encoding='utf-8')
 
 class ViewTime():
