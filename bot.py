@@ -1965,6 +1965,7 @@ def atualizar_catalogo_miniapp():
         image = _miniapp_image_for_service(produto['name'], image_map)
         if image:
             produto['image'] = image
+            produto['updated_at'] = int(time.time())
         catalogo.append(produto)
 
     os.makedirs(os.path.dirname(MINIAPP_CATALOG_FILE), exist_ok=True)
@@ -2000,7 +2001,7 @@ def publicar_miniapp_no_git(motivo):
                 if push.returncode != 0:
                     return False, (push.stderr or push.stdout or 'Falha ao enviar commits pendentes para o Git.').strip()
                 return True, f'Publicado no GitHub ({ahead_count} commit pendente enviado).'
-            return True, 'Imagem já estava salva localmente, mas não houve alteração nova para publicar.'
+            return True, 'Imagem já estava salva localmente. Se ainda não apareceu no site, aguarde o cache do Telegram/GitHub ou envie a imagem novamente.'
         commit_msg = f'Update Mini App service images: {motivo}'[:120]
         commit = subprocess.run(['git', 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, check=False)
         if commit.returncode != 0:

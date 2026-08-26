@@ -1,6 +1,7 @@
 const tg = window.Telegram?.WebApp;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const botUsername = 'vendasdoramon_bot';
+const defaultProductImage = 'assets/store-banner.png';
 const state = { products: [], cart: new Map(), filter: 'todos', query: '' };
 
 const list = document.querySelector('#productList');
@@ -24,18 +25,14 @@ function category(name) {
   return 'outros';
 }
 
-function iconFor(name) {
-  const value = name.toLocaleLowerCase('pt-BR');
-  if (value.includes('music') || value.includes('spotify') || value.includes('deezer') || value.includes('tidal')) return '🎧';
-  if (value.includes('canva') || value.includes('capcut')) return '🎨';
-  if (value.includes('youtube') || value.includes('video')) return '▶️';
-  if (value.includes('tela')) return '📺';
-  if (value.includes('conta')) return '🔐';
-  return '📦';
-}
-
 function cleanName(name) {
   return name.replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim();
+}
+
+function imageFor(product) {
+  const source = product.image || defaultProductImage;
+  const separator = source.includes('?') ? '&' : '?';
+  return `${source}${separator}v=${encodeURIComponent(product.updated_at || 'default')}`;
 }
 
 function visibleProducts() {
@@ -55,9 +52,7 @@ function renderProducts() {
   }
   list.innerHTML = products.map((product) => `
     <article class="product">
-      ${product.image
-        ? `<img class="product-image" src="${escapeHtml(product.image)}" alt="${escapeHtml(cleanName(product.name))}" loading="lazy">`
-        : `<div class="product-icon" aria-hidden="true">${iconFor(product.name)}</div>`}
+      <img class="product-image" src="${escapeHtml(imageFor(product))}" alt="${escapeHtml(cleanName(product.name))}" loading="lazy" onerror="this.onerror=null;this.src='${defaultProductImage}'">
       <h3>${escapeHtml(cleanName(product.name))}</h3>
       <p class="stock">${product.stock} unidade${product.stock === 1 ? '' : 's'} disponível${product.stock === 1 ? '' : 'is'}</p>
       <div class="product-bottom">
@@ -161,7 +156,7 @@ checkout.addEventListener('click', () => {
   window.setTimeout(() => tg?.close?.(), 500);
 });
 
-fetch('catalog.json', { cache: 'no-store' })
+fetch(`catalog.json?v=${Date.now()}`, { cache: 'no-store' })
   .then((response) => response.json())
   .then((products) => {
     state.products = products;
