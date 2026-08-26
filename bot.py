@@ -4088,6 +4088,14 @@ def adicionar_login(message):
                     bot.reply_to(message, "Erro ao adicionar, vocÃ© enviou em um formato nÃ£o permitido!")
     bot.reply_to(message, f"Feito! VocÃª abasteceu <b>{quantity}</b> login(s).", parse_mode='HTML')
 
+    # Atualizar catálogo do miniapp após adicionar logins
+    if quantity > 0:
+        try:
+            atualizar_catalogo_miniapp()
+            publicar_miniapp_no_git('atualizar estoque')
+        except Exception as e:
+            print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
+
     for prod, qtd in notificacoes.items():
         notificar_novos_logins(prod, qtd)
 
@@ -4148,6 +4156,13 @@ def remover_login(message):
         stri = message.text.strip().split(f'{separador}')
         api.ControleLogins.remover_login(nome=stri[0], email=stri[1])
         bot.reply_to(message, "Removido com sucesso do estoque!")
+        
+        # Atualizar catálogo do miniapp após remover login
+        try:
+            atualizar_catalogo_miniapp()
+            publicar_miniapp_no_git('remover login do estoque')
+        except Exception as e:
+            print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
     except:
         bot.reply_to(message, "Erro ao remover o login.")
 
@@ -4156,6 +4171,13 @@ def remover_por_plataforma(message):
     try:
         api.ControleLogins.remover_por_nome(plat)
         bot.reply_to(message, f"Todos os logins de {plat} foram removidos com sucesso!")
+        
+        # Atualizar catálogo do miniapp após remover logins
+        try:
+            atualizar_catalogo_miniapp()
+            publicar_miniapp_no_git('remover plataforma do estoque')
+        except Exception as e:
+            print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
     except:
         bot.reply_to(message, 'Erro ao remover os logins...')
 
@@ -4246,12 +4268,19 @@ def zerar_estoque(call):
     """
     Zera completamente o estoque de logins.
     """
-    api.ControleLogins.zerar_estoque()  # Chamando a funÃ§Ã£o para zerar o estoque
+    api.ControleLogins.zerar_estoque()  # Chamando a função para zerar o estoque
+    
+    # Atualizar catálogo do miniapp após zerar estoque
+    try:
+        atualizar_catalogo_miniapp()
+        publicar_miniapp_no_git('zerar estoque')
+    except Exception as e:
+        print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
     
     bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text='âœ… O estoque foi zerado com sucesso!',
+        text='✅ O estoque foi zerado com sucesso!',
         parse_mode='HTML'
     )
 
@@ -6779,7 +6808,15 @@ def executar_compra_quantidade(message, user_id, servico, quantidade):
         comprados += 1
         time.sleep(1.0)
 
-    bot.send_message(message.chat.id, f"Compra finalizada. VocÃª comprou {comprados} logins de {servico}.")
+    bot.send_message(message.chat.id, f"Compra finalizada. Você comprou {comprados} logins de {servico}.")
+    
+    # Atualizar catálogo do miniapp após compra
+    if comprados > 0:
+        try:
+            atualizar_catalogo_miniapp()
+            publicar_miniapp_no_git('atualizar estoque após compra')
+        except Exception as e:
+            print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
 
 
 def solicitar_aceite_termos(message, tipo_compra, dados):
@@ -6804,7 +6841,7 @@ def solicitar_aceite_termos(message, tipo_compra, dados):
 def executar_compra_direta(message, user_id, servico):
     resultado_peek = api.ControleLogins.peek_primeiro_disponivel(servico)
     if not resultado_peek:
-        bot.send_message(message.chat.id, "ServiÃ§o esgotado ou nÃ£o encontrado.")
+        bot.send_message(message.chat.id, "Serviço esgotado ou não encontrado.")
         return
 
     _, valor, _, _, _, _ = resultado_peek
@@ -6815,12 +6852,19 @@ def executar_compra_direta(message, user_id, servico):
 
     resultado = api.ControleLogins.pegar_primeiro_disponivel(servico)
     if not resultado:
-        bot.send_message(message.chat.id, "ServiÃ§o esgotado ou nÃ£o encontrado.")
+        bot.send_message(message.chat.id, "Serviço esgotado ou não encontrado.")
         return
 
     nome, valor, email, senha, descricao, duracao = resultado
     api.InfoUser.tirar_saldo(user_id, valor)
     entregar(message, nome, valor, email, senha, descricao, duracao)
+    
+    # Atualizar catálogo do miniapp após compra
+    try:
+        atualizar_catalogo_miniapp()
+        publicar_miniapp_no_git('atualizar estoque após compra')
+    except Exception as e:
+        print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
 
 
 def executar_compra_carrinho(message, user_id):
@@ -6863,6 +6907,14 @@ def executar_compra_carrinho(message, user_id):
                 time.sleep(0.5)
 
         database.clear_carrinho(user_id)
+
+        # Atualizar catálogo do miniapp após compra do carrinho
+        if total_comprado > 0:
+            try:
+                atualizar_catalogo_miniapp()
+                publicar_miniapp_no_git('atualizar estoque após compra carrinho')
+            except Exception as e:
+                print(f"[MINIAPP] Erro ao atualizar catálogo: {e}")
 
         saldo_atual = database.get_user_balance(user_id)
         texto = "âœ… <b>COMPRA FINALIZADA COM SUCESSO!</b>\n\n"

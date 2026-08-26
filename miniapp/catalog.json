@@ -1,241 +1,187 @@
 [
   {
-    "name": "⚫️CONTA TIDAL FAMILIA",
-    "price": 7,
-    "stock": 3,
-    "image": "assets/service-images/auto-icons/contatidal.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️CONTA PRIME VIDEO",
-    "price": 7,
-    "stock": 11,
-    "image": "assets/service-images/auto-icons/10contaprimevideoseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️PRIME VIDEO 6 MESES CONTA",
-    "price": 30,
-    "stock": 3,
-    "image": "assets/service-images/auto-icons/10contaprimevideoseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️PRIME VIDEO COM PARAMOUNT CONTA",
-    "price": 14,
-    "stock": 2,
-    "image": "assets/service-images/auto-icons/primevideocomparamountconta.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️PRIME VIDEO COM PREMIERE CONTA",
-    "price": 14,
-    "stock": 4,
-    "image": "assets/service-images/auto-icons/primevideocompremieretela.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️PRIME VIDEO SEM ANUNCIO CONTA",
-    "price": 9,
-    "stock": 4,
-    "image": "assets/service-images/auto-icons/10contaprimevideoseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🅿️TELA PRIME VIDEO",
-    "price": 4,
-    "stock": 4,
-    "image": "assets/service-images/auto-icons/telaprimevideo2adicionais.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🎥CAPCUT PRO 1 ACESSO",
-    "price": 9,
-    "stock": 3
-  },
-  {
-    "name": "🎥CONTA CAPCUT PRO",
-    "price": 14,
-    "stock": 2
-  },
-  {
-    "name": "🎧CONTA DEEZER FAMILY",
-    "price": 5,
-    "stock": 5,
-    "image": "assets/service-images/auto-icons/deezerpremiumlink.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🎧CONTA SPOTIFY 3 MESES",
-    "price": 11,
-    "stock": 6,
-    "image": "assets/service-images/auto-icons/spotify3meses.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🎨CANVA PRO",
-    "price": 20,
-    "stock": 19,
-    "image": "assets/service-images/auto-icons/canvaproanualseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🎨CONVITE CANVA PRO(SEU E-MAIL)",
-    "price": 2,
-    "stock": 1,
-    "image": "assets/service-images/auto-icons/canvaproanualseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔴CONTA GLOBO BÁSICA",
-    "price": 3,
-    "stock": 8
-  },
-  {
-    "name": "🔴CONTA GLOBO PREMIUM",
-    "price": 5,
-    "stock": 54
-  },
-  {
-    "name": "🔴CONTA NETFLIX PADRÃO COM ANUN",
-    "price": 14,
-    "stock": 1,
-    "image": "assets/service-images/auto-icons/teladisneypadrosemanuncio.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔴CONTA NETFLIX PREMIUM",
-    "price": 26,
-    "stock": 20,
-    "image": "assets/service-images/auto-icons/contanetflixpcomanncio.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔴GLOBO PREMIUM COM TELECINE TELA",
-    "price": 4,
-    "stock": 5,
-    "image": "assets/service-images/auto-icons/telaglobocnspremieretelecine.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔴TELA GLOBO PLAY COM ANÚNCIO",
-    "price": 2,
-    "stock": 1,
-    "image": "assets/service-images/auto-icons/10contagloboplayseuemail.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔴TELA GLOBO PREMIUM",
-    "price": 3,
-    "stock": 6
-  },
-  {
-    "name": "🔴YOUTUBE PREMIUM CONVITE(SEU E-MAIL)",
-    "price": 7,
-    "stock": 7,
-    "image": "assets/service-images/auto-icons/contayoutubefamiliaseugmailnovo.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵CONTA DISNEY COM ANUNCIO",
-    "price": 8,
-    "stock": 5,
-    "image": "assets/service-images/auto-icons/contadisneypadro.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵CONTA HBOMAX COM ANUNCIO",
-    "price": 4,
-    "stock": 1,
-    "image": "assets/service-images/auto-icons/contahbomaxplatinum.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵CONTA HBOMAX SEM ANUNCIO",
-    "price": 7,
-    "stock": 10,
-    "image": "assets/service-images/auto-icons/contahbomaxplatinum.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵DISNEY PADRÃO COM ANÚNCIO TELA",
-    "price": 4,
-    "stock": 1,
-    "image": "assets/service-images/auto-icons/teladisneypadrosemanuncio.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵DISNEY PREMIUM TELA",
-    "price": 8,
-    "stock": 22,
-    "image": "assets/service-images/auto-icons/contadisneypadro.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵HBO MAX  STANDARD TELA",
-    "price": 3,
-    "stock": 4,
-    "image": "assets/service-images/auto-icons/contahbomaxplatinum.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🔵TELA HBO MAX",
-    "price": 3,
-    "stock": 2,
-    "image": "assets/service-images/auto-icons/telahbomaxplatinum.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🛒NETFLIX PREMIUM TELA",
-    "price": 8,
-    "stock": 18,
-    "image": "assets/service-images/auto-icons/contanetflixpcomanncio.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🟠CONTA CRUNCHYROLL PREMIUM",
-    "price": 8,
-    "stock": 5,
-    "image": "assets/service-images/auto-icons/contacrunchyrollmegafan.jpg",
-    "updated_at": 1787704548
-  },
-  {
-    "name": "🟠TELA CRUNCHYROLL PREMIUM",
-    "price": 4,
-    "stock": 6,
-    "image": "assets/service-images/auto-icons/contacrunchyrollmegafan.jpg",
-    "updated_at": 1787704548
-  },
-  {
     "name": "🟡20 CODIGO UNITV",
-    "price": 196,
+    "price": 196.0,
     "stock": 2
   },
   {
     "name": "🟡45 CODIGO UNITV",
-    "price": 383,
+    "price": 383.0,
     "stock": 2
   },
   {
+    "name": "🎨CANVA PRO",
+    "price": 20.0,
+    "stock": 19
+  },
+  {
+    "name": "🎥CAPCUT PRO 1 ACESSO",
+    "price": 9.0,
+    "stock": 3
+  },
+  {
+    "name": "🎥CONTA CAPCUT PRO",
+    "price": 14.0,
+    "stock": 2
+  },
+  {
+    "name": "🟠CONTA CRUNCHYROLL PREMIUM",
+    "price": 8.0,
+    "stock": 5
+  },
+  {
+    "name": "🎧CONTA DEEZER FAMILY",
+    "price": 5.0,
+    "stock": 5
+  },
+  {
+    "name": "🔵CONTA DISNEY COM ANUNCIO",
+    "price": 8.0,
+    "stock": 5
+  },
+  {
+    "name": "🔴CONTA GLOBO BÁSICA",
+    "price": 3.0,
+    "stock": 8
+  },
+  {
+    "name": "🔴CONTA GLOBO PREMIUM",
+    "price": 5.0,
+    "stock": 54
+  },
+  {
+    "name": "🔵CONTA HBOMAX COM ANUNCIO",
+    "price": 4.0,
+    "stock": 1
+  },
+  {
+    "name": "🔵CONTA HBOMAX SEM ANUNCIO",
+    "price": 7.0,
+    "stock": 10
+  },
+  {
+    "name": "🔴CONTA NETFLIX PADRÃO COM ANUN",
+    "price": 14.0,
+    "stock": 1
+  },
+  {
+    "name": "🔴CONTA NETFLIX PREMIUM",
+    "price": 26.0,
+    "stock": 20
+  },
+  {
+    "name": "🅿️CONTA PRIME VIDEO",
+    "price": 7.0,
+    "stock": 11
+  },
+  {
+    "name": "🎧CONTA SPOTIFY 3 MESES",
+    "price": 11.0,
+    "stock": 6
+  },
+  {
+    "name": "⚫️CONTA TIDAL FAMILIA",
+    "price": 7.0,
+    "stock": 3
+  },
+  {
+    "name": "🎨CONVITE CANVA PRO(SEU E-MAIL)",
+    "price": 2.0,
+    "stock": 1
+  },
+  {
+    "name": "🔵DISNEY PADRÃO COM ANÚNCIO TELA",
+    "price": 4.0,
+    "stock": 1
+  },
+  {
+    "name": "🔵DISNEY PREMIUM TELA",
+    "price": 8.0,
+    "stock": 22
+  },
+  {
+    "name": "🔴GLOBO PREMIUM COM TELECINE TELA",
+    "price": 4.0,
+    "stock": 5
+  },
+  {
+    "name": "🔵HBO MAX  STANDARD TELA",
+    "price": 3.0,
+    "stock": 4
+  },
+  {
+    "name": "🟣KRATOR+",
+    "price": 10.0,
+    "stock": 5
+  },
+  {
+    "name": "🛒NETFLIX PREMIUM TELA",
+    "price": 8.0,
+    "stock": 18
+  },
+  {
+    "name": "🅿️PRIME VIDEO 6 MESES CONTA",
+    "price": 30.0,
+    "stock": 3
+  },
+  {
+    "name": "🅿️PRIME VIDEO COM PARAMOUNT CONTA",
+    "price": 14.0,
+    "stock": 2
+  },
+  {
+    "name": "🅿️PRIME VIDEO COM PREMIERE CONTA",
+    "price": 14.0,
+    "stock": 4
+  },
+  {
+    "name": "🅿️PRIME VIDEO SEM ANUNCIO CONTA",
+    "price": 9.0,
+    "stock": 4
+  },
+  {
+    "name": "🟣RECORDPLUS TELA",
+    "price": 3.0,
+    "stock": 5
+  },
+  {
+    "name": "🟠TELA CRUNCHYROLL PREMIUM",
+    "price": 4.0,
+    "stock": 6
+  },
+  {
+    "name": "🔴TELA GLOBO PLAY COM ANÚNCIO",
+    "price": 2.0,
+    "stock": 1
+  },
+  {
+    "name": "🔴TELA GLOBO PREMIUM",
+    "price": 3.0,
+    "stock": 6
+  },
+  {
+    "name": "🔵TELA HBO MAX",
+    "price": 3.0,
+    "stock": 2
+  },
+  {
+    "name": "🅿️TELA PRIME VIDEO",
+    "price": 4.0,
+    "stock": 4
+  },
+  {
     "name": "🟡UNITV CODIGO DE ATIVAÇÃO",
-    "price": 12,
+    "price": 12.0,
     "stock": 48
   },
   {
     "name": "🟢WAREZ PLAY 2 APARELHOS",
-    "price": 10,
+    "price": 10.0,
     "stock": 9
   },
   {
-    "name": "🟣KRATOR+",
-    "price": 10,
-    "stock": 5
-  },
-  {
-    "name": "🟣RECORDPLUS TELA",
-    "price": 3,
-    "stock": 5,
-    "image": "assets/service-images/auto-icons/telarecordplus.jpg",
-    "updated_at": 1787704548
+    "name": "🔴YOUTUBE PREMIUM CONVITE(SEU E-MAIL)",
+    "price": 7.0,
+    "stock": 7
   }
 ]
