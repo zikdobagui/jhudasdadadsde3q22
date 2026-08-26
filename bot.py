@@ -189,7 +189,7 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 # OBRIGATORIEDADE DE CANAL/GRUPO
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
-MINIAPP_URL = "https://zikdobagui.github.io/jhudasdadadsde3q22/"
+MINIAPP_URL = "https://ramonatualiza.squareweb.app/"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')

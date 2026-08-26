@@ -156,11 +156,8 @@ checkout.addEventListener('click', () => {
   window.setTimeout(() => tg?.close?.(), 500);
 });
 
-// URL da API de catálogo em tempo real (SquareCloud)
-const catalogApiUrl = (window.APP_CONFIG && window.APP_CONFIG.catalogApiUrl)
-  || 'https://ramonatualiza.squareweb.app/catalog.json';
-
-fetch(`${catalogApiUrl}?v=${Date.now()}`, { cache: 'no-store' })
+// Mesmo servidor que entrega o site também responde o estoque em tempo real
+fetch(`catalog.json?v=${Date.now()}`, { cache: 'no-store' })
   .then((response) => {
     if (!response.ok) throw new Error('Falha ao carregar estoque');
     return response.json();
