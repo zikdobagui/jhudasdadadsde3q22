@@ -189,8 +189,10 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
 MINIAPP_URL = "https://zikdobagui.github.io/jhudasdadadsde3q22/"
-MINIAPP_IMAGES_FILE = os.path.join('database', 'miniapp_images.json')
-MINIAPP_SERVICE_IMAGES_DIR = os.path.join('miniapp', 'assets', 'service-images')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
+MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')
+MINIAPP_SERVICE_IMAGES_DIR = os.path.join(BASE_DIR, 'miniapp', 'assets', 'service-images')
 
 SALES_GROUP_ID = -1002573223312
 RESERVE_VERIFICATION_FILE = 'database/reserve_verified.json'
@@ -1910,7 +1912,7 @@ def receber_carrinho_miniapp(message):
 
 def carregar_catalogo_miniapp():
     try:
-        with open(os.path.join('miniapp', 'catalog.json'), 'r', encoding='utf-8') as f:
+        with open(MINIAPP_CATALOG_FILE, 'r', encoding='utf-8') as f:
             produtos = json.load(f)
         if isinstance(produtos, list):
             return produtos
@@ -1965,27 +1967,32 @@ def atualizar_catalogo_miniapp():
             produto['image'] = image
         catalogo.append(produto)
 
-    os.makedirs('miniapp', exist_ok=True)
-    with open(os.path.join('miniapp', 'catalog.json'), 'w', encoding='utf-8') as f:
+    os.makedirs(os.path.dirname(MINIAPP_CATALOG_FILE), exist_ok=True)
+    with open(MINIAPP_CATALOG_FILE, 'w', encoding='utf-8') as f:
         json.dump(catalogo, f, indent=2, ensure_ascii=False)
     return catalogo
 
 def publicar_miniapp_no_git(motivo):
     try:
-        paths = [
-            path for path in ('miniapp/catalog.json', MINIAPP_SERVICE_IMAGES_DIR, MINIAPP_IMAGES_FILE)
-            if os.path.exists(path)
-        ]
+        paths = ['miniapp/catalog.json']
+        if os.path.exists(MINIAPP_SERVICE_IMAGES_DIR):
+            paths.append('miniapp/assets/service-images')
+        if os.path.exists(MINIAPP_IMAGES_FILE):
+            paths.append('database/miniapp_images.json')
         if paths:
-            subprocess.run(['git', 'add', *paths], check=False)
-        status = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True, check=False)
+            add = subprocess.run(['git', 'add', *paths], cwd=BASE_DIR, capture_output=True, text=True, check=False)
+            if add.returncode != 0:
+                return False, (add.stderr or add.stdout or 'Falha ao preparar arquivos no Git.').strip()
+        status = subprocess.run(['git', 'status', '--porcelain'], cwd=BASE_DIR, capture_output=True, text=True, check=False)
+        if status.returncode != 0:
+            return False, (status.stderr or status.stdout or 'Git não disponível nessa pasta.').strip()
         if not status.stdout.strip():
             return True, 'Nenhuma mudança nova para publicar.'
         commit_msg = f'Update Mini App service images: {motivo}'[:120]
-        commit = subprocess.run(['git', 'commit', '-m', commit_msg], capture_output=True, text=True, check=False)
+        commit = subprocess.run(['git', 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, check=False)
         if commit.returncode != 0:
             return False, (commit.stderr or commit.stdout or 'Falha ao criar commit.').strip()
-        push = subprocess.run(['git', 'push', 'origin', 'main'], capture_output=True, text=True, check=False)
+        push = subprocess.run(['git', 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True, check=False)
         if push.returncode != 0:
             return False, (push.stderr or push.stdout or 'Falha ao enviar para o Git.').strip()
         return True, 'Publicado no GitHub. O GitHub Pages vai atualizar em instantes.'
