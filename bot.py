@@ -4372,6 +4372,53 @@ def mudar_valor_todos(message):
     except ValueError:
         bot.reply_to(message, "Valor invÃ¡lido. Use, por exemplo: 12.99 ou 12,99.")
 
+def _mascarar_senha_estoque(senha):
+    senha = str(senha or '')
+    if len(senha) <= 2:
+        return '*' * len(senha)
+    return senha[:1] + ('*' * max(len(senha) - 2, 1)) + senha[-1:]
+
+def pesquisar_estoque_admin(message):
+    termo = message.text.strip()
+    if not termo:
+        bot.reply_to(message, "Envie um nome, email ou palavra da descriÃ§Ã£o para pesquisar.")
+        return
+
+    resultados = api.ControleLogins.pesquisar_estoque(termo, limite=30)
+    if not resultados:
+        bot.reply_to(
+            message,
+            f"Nenhum login abastecido encontrado para: <code>{html.escape(termo)}</code>",
+            parse_mode='HTML'
+        )
+        return
+
+    linhas = [
+        f"🔎 <b>Resultado da pesquisa:</b> <code>{html.escape(termo)}</code>",
+        f"<b>{len(resultados)}</b> login(s) encontrado(s).",
+        ""
+    ]
+    for index, acesso in enumerate(resultados, start=1):
+        valor = acesso.get('valor', 0)
+        try:
+            valor_fmt = f"{float(valor):.2f}"
+        except (TypeError, ValueError):
+            valor_fmt = html.escape(str(valor))
+        linhas.append(
+            "\n".join([
+                f"<b>{index}. {html.escape(str(acesso.get('nome', '')))}</b>",
+                f"• Valor: R${valor_fmt}",
+                f"• Email: <code>{html.escape(str(acesso.get('email', '')))}</code>",
+                f"• Senha: <code>{html.escape(_mascarar_senha_estoque(acesso.get('senha', '')))}</code>",
+                f"• DuraÃ§Ã£o: {html.escape(str(acesso.get('duracao', '')))}",
+            ])
+        )
+
+    texto = "\n\n".join(linhas)
+    if len(resultados) >= 30:
+        texto += "\n\nMostrei os 30 primeiros resultados. Pesquise algo mais especÃ­fico se precisar."
+    bot.reply_to(message, texto, parse_mode='HTML')
+
 def configurar_logins(message):
     """
     Exibe o menu de configuraÃ§Ã£o de logins com uma interface melhorada.
@@ -4394,11 +4441,14 @@ def configurar_logins(message):
         f'Envie o serviÃ§o e o novo valor no formato:\n'
         f'<code>SERVICO{separador}VALOR</code>\n\n'
         f'â€¢ <b>Alterar Valor de Todos</b>\n'
-        f'Envie o valor e todos os serviÃ§os serÃ©o ajustados para esse preÃ©o.'
+        f'Envie o valor e todos os serviÃ§os serÃ©o ajustados para esse preÃ©o.\n\n'
+        f'â€¢ <b>Pesquisar Estoque</b>\n'
+        f'Busque por serviÃ§o, email ou descriÃ§Ã£o para ver o que foi abastecido.'
     )
     
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton('ðŸ“‹ Adicionar Login', callback_data='adicionar_login'))
+    markup.row(InlineKeyboardButton('🔎 Pesquisar Estoque', callback_data='pesquisar_estoque_admin'))
     markup.row(InlineKeyboardButton('âš™ï¸ Remover Login', callback_data='remover_login'),
                InlineKeyboardButton('âœ… Remover por Plataforma', callback_data='remover_por_plataforma'))
     markup.row(InlineKeyboardButton('â€¢ Zerar Estoque', callback_data='confirmar_zerar_estoque'))
@@ -9537,6 +9587,14 @@ def callback_query(call):
             reply_markup=types.ForceReply()
         )
         bot.register_next_step_handler(call.message, adicionar_login)
+    if call.data == 'pesquisar_estoque_admin':
+        bot.send_message(
+            call.message.chat.id,
+            "Envie o nome do serviÃ§o, email ou palavra da descriÃ§Ã£o que deseja pesquisar no estoque:",
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(call.message, pesquisar_estoque_admin)
     if call.data == 'remover_login':
         bot.send_message(
             call.message.chat.id,

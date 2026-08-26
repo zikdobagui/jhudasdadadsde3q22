@@ -1112,6 +1112,28 @@ class ControleLogins():
             logins += f'\n{nome}: {quantidade}'
         montagem += f"\n<code>{logins}</code>"
         return montagem
+    def pesquisar_estoque(termo, limite=30):
+        termo = str(termo or '').strip().casefold()
+        if not termo:
+            return []
+
+        with open_utf8('database/acessos.json', 'r') as f:
+            data = json.load(f)
+
+        resultados = []
+        for acesso in data.get("acessos", []):
+            campos = (
+                acesso.get("nome", ""),
+                acesso.get("email", ""),
+                acesso.get("descricao", ""),
+                acesso.get("duracao", "")
+            )
+            texto = " ".join(str(campo) for campo in campos).casefold()
+            if termo in texto:
+                resultados.append(acesso)
+                if len(resultados) >= limite:
+                    break
+        return resultados
     def criar_estoque_detalhado():
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
