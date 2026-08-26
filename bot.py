@@ -316,6 +316,69 @@ pending_notif_reabast = {}
 # Compras aguardando aceite dos termos antes de descontar saldo/entregar
 pending_terms_purchase = {}
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Sistema de Follow-up: Envia mensagem após X minutos se usuário não comprou
+# ═══════════════════════════════════════════════════════════════════════════
+followup_timers = {}  # {user_id: Timer}
+followup_delay = 300  # 5 minutos (300 segundos)
+
+def agendar_followup(user_id):
+    """Agenda mensagem de follow-up para ser enviada após X minutos"""
+    cancelar_followup(user_id)  # Cancela timer anterior se existir
+    
+    timer = Timer(followup_delay, enviar_mensagem_followup, args=[user_id])
+    timer.daemon = True
+    timer.start()
+    followup_timers[user_id] = timer
+
+def cancelar_followup(user_id):
+    """Cancela o timer de follow-up se existir"""
+    if user_id in followup_timers:
+        followup_timers[user_id].cancel()
+        del followup_timers[user_id]
+
+def enviar_mensagem_followup(user_id):
+    """Envia mensagem de follow-up se usuário ainda não fez compra"""
+    try:
+        # Verifica se o usuário fez alguma compra
+        user_data = database.load_user_data(user_id)
+        if not user_data:
+            return
+        
+        total_compras = user_data.get('total_compras', 0)
+        if total_compras > 0:
+            # Usuário já comprou, não envia mensagem
+            return
+        
+        # Monta a mensagem
+        texto = (
+            "👋 Olá! Vi que você ainda não realizou nenhuma compra.\n\n"
+            "Posso te ajudar? Escolha uma das opções abaixo 👇\n\n"
+            "🔔 Para receber novidades e lançamentos, use: /alertas"
+        )
+        
+        # Monta o teclado inline
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton('🎧 Suporte ↗', url='https://t.me/RamonSuporteV'),
+            InlineKeyboardButton('🛒 Comprar Agora', callback_data='servicos')
+        )
+        markup.row(
+            InlineKeyboardButton('🛒 Carrinho', callback_data='ver_carrinho'),
+            InlineKeyboardButton('👀 Termos', callback_data='termos_uso')
+        )
+        
+        bot.send_message(user_id, texto, parse_mode='HTML', reply_markup=markup)
+        
+        # Remove do dicionário após enviar
+        if user_id in followup_timers:
+            del followup_timers[user_id]
+            
+    except Exception as e:
+        print(f"[FOLLOWUP] Erro ao enviar para {user_id}: {e}")
+        if user_id in followup_timers:
+            del followup_timers[user_id]
+
 # DiretÃ©rio onde os Ã­cones serÃ©o salvos
 ICONS_DIR = 'icons'
 if not os.path.exists(ICONS_DIR):
@@ -6172,6 +6235,9 @@ def handle_start(message):
     # Usando a funÃ§Ã£o gerar_menu_principal() para os botÃµes
     markup = gerar_menu_principal()
 
+    # Agenda mensagem de follow-up após 5 minutos
+    agendar_followup(message.from_user.id)
+
     if message.from_user.is_bot:
         edit_html_or_plain(
             chat_id=message.chat.id,
@@ -6777,6 +6843,9 @@ def processar_compra_quantidade(message, servico):
 
 
 def executar_compra_quantidade(message, user_id, servico, quantidade):
+    # Cancela follow-up pois usuário está fazendo compra
+    cancelar_followup(user_id)
+    
     resultado_peek = api.ControleLogins.peek_primeiro_disponivel(servico)
     if not resultado_peek:
         bot.send_message(message.chat.id, f"Acabaram os logins de {servico}.")
@@ -6839,6 +6908,9 @@ def solicitar_aceite_termos(message, tipo_compra, dados):
 
 
 def executar_compra_direta(message, user_id, servico):
+    # Cancela follow-up pois usuário está fazendo compra
+    cancelar_followup(user_id)
+    
     resultado_peek = api.ControleLogins.peek_primeiro_disponivel(servico)
     if not resultado_peek:
         bot.send_message(message.chat.id, "Serviço esgotado ou não encontrado.")
@@ -6868,6 +6940,9 @@ def executar_compra_direta(message, user_id, servico):
 
 
 def executar_compra_carrinho(message, user_id):
+    # Cancela follow-up pois usuário está fazendo compra
+    cancelar_followup(user_id)
+    
     carrinho = database.get_carrinho(user_id)
 
     if not carrinho:
