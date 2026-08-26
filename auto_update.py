@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent
 REMOTE = os.getenv("AUTO_GIT_REMOTE", "origin")
 BRANCH = os.getenv("AUTO_GIT_BRANCH", "main")
 UPDATE_NOTIFY_FILE = ROOT / ".last_update_notify"
-LOCAL_DATA_DIRS = ("botoes",)
+LOCAL_DATA_DIRS = ("botoes", "database", "historicos")
 LOCAL_DATA_FILES = (
     "settings/notify.json",
     "settings/roleta.json",

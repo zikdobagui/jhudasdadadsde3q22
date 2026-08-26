@@ -14,6 +14,8 @@ settings/button_overrides.json
 
 backups/
 historicos/
+database/*
+!database/.gitkeep
 tmp_streaming_emojis/
 database/*.db
 database/*.sqlite

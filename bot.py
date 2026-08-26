@@ -27,6 +27,7 @@ import threading
 import random
 import html
 import zipfile
+import shutil
 import urllib.parse
 import central as api
 import pytz
@@ -193,6 +194,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')
 MINIAPP_SERVICE_IMAGES_DIR = os.path.join(BASE_DIR, 'miniapp', 'assets', 'service-images')
+MINIAPP_AUTO_ICONS_DIR = os.path.join(MINIAPP_SERVICE_IMAGES_DIR, 'auto-icons')
 
 SALES_GROUP_ID = -1002573223312
 RESERVE_VERIFICATION_FILE = 'database/reserve_verified.json'
@@ -1947,6 +1949,62 @@ def _miniapp_image_for_service(nome, image_map=None):
             return value
     return ''
 
+def _miniapp_auto_icon_for_service(nome):
+    if not os.path.isdir(ICONS_DIR):
+        return ''
+    nome_key = _normalize_key(nome)
+    if not nome_key:
+        return ''
+    stopwords = {
+        'conta', 'tela', 'premium', 'padrao', 'standard', 'anuncio', 'anuncios',
+        'acesso', 'acessos', 'convite', 'seu', 'email', 'gmail', 'link', 'meses',
+        'mes', 'com', 'sem', 'familia', 'family', 'adicional', 'adicionais'
+    }
+    nome_tokens = {
+        token for token in re.findall(r'[a-z0-9]{3,}', re.sub(r'[^a-zA-Z0-9]+', ' ', nome.lower()))
+        if token not in stopwords
+    }
+    exts = {'.jpg', '.jpeg', '.png', '.webp'}
+    best = None
+    best_score = 0
+    for fname in os.listdir(ICONS_DIR):
+        base, ext = os.path.splitext(fname)
+        if ext.lower() not in exts:
+            continue
+        icon_key = _normalize_key(base)
+        if not icon_key:
+            continue
+        score = 0
+        if icon_key == nome_key:
+            score = 10000
+        elif icon_key in nome_key:
+            score = 6000 + len(icon_key)
+        elif nome_key in icon_key:
+            score = 5000 + len(nome_key)
+        else:
+            icon_tokens = {
+                token for token in re.findall(r'[a-z0-9]{3,}', re.sub(r'[^a-zA-Z0-9]+', ' ', base.lower()))
+                if token not in stopwords
+            }
+            shared = nome_tokens & icon_tokens
+            partial = [token for token in nome_tokens if token in icon_key]
+            score = sum(len(token) * 10 for token in shared) + sum(len(token) for token in partial)
+        if score > best_score:
+            best_score = score
+            best = fname
+    if not best or best_score < 6:
+        return ''
+
+    os.makedirs(MINIAPP_AUTO_ICONS_DIR, exist_ok=True)
+    source = os.path.join(ICONS_DIR, best)
+    target = os.path.join(MINIAPP_AUTO_ICONS_DIR, best)
+    try:
+        if not os.path.exists(target) or os.path.getmtime(source) > os.path.getmtime(target):
+            shutil.copy2(source, target)
+        return f'assets/service-images/auto-icons/{best}'
+    except Exception:
+        return ''
+
 def atualizar_catalogo_miniapp():
     image_map = _load_miniapp_images()
     agrupados = {}
@@ -1962,7 +2020,7 @@ def atualizar_catalogo_miniapp():
 
     catalogo = []
     for produto in sorted(agrupados.values(), key=lambda item: _normalize_key(item['name'])):
-        image = _miniapp_image_for_service(produto['name'], image_map)
+        image = _miniapp_image_for_service(produto['name'], image_map) or _miniapp_auto_icon_for_service(produto['name'])
         if image:
             produto['image'] = image
             produto['updated_at'] = int(time.time())
@@ -1978,8 +2036,6 @@ def publicar_miniapp_no_git(motivo):
         paths = ['miniapp/catalog.json']
         if os.path.exists(MINIAPP_SERVICE_IMAGES_DIR):
             paths.append('miniapp/assets/service-images')
-        if os.path.exists(MINIAPP_IMAGES_FILE):
-            paths.append('database/miniapp_images.json')
         if paths:
             add = subprocess.run(['git', 'add', *paths], cwd=BASE_DIR, capture_output=True, text=True, check=False)
             if add.returncode != 0:
