@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#080b10">
   <title>Ramon Store</title>
-  <link rel="stylesheet" href="styles.css?v=20260826-service-images">
+  <link rel="stylesheet" href="styles.css?v=20260825-snow">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="site-backdrop" aria-hidden="true">
-    <span></span>
-    <span></span>
-    <span></span>
-  </div>
+  <!-- grade de linhas estilo SquareCloud -->
+  <div class="grid-bg" aria-hidden="true"></div>
+  <!-- neve animada -->
+  <canvas id="snow-canvas" aria-hidden="true"></canvas>
   <header class="topbar">
     <div>
       <strong>RAMON STORE</strong>
@@ -80,6 +79,74 @@
   </aside>
 
   <div class="toast" id="toast" role="status"></div>
-  <script src="app.js?v=20260826-service-images"></script>
+  <script src="app.js?v=20260825-snow"></script>
+  <script>
+    /* ── Neve animada ── */
+    (function () {
+      const canvas = document.getElementById('snow-canvas');
+      const ctx    = canvas.getContext('2d');
+      let W, H, flakes = [];
+      const COUNT = 120;
+
+      function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+      }
+
+      function randomFlake() {
+        return {
+          x:       Math.random() * W,
+          y:       Math.random() * H - H,
+          r:       Math.random() * 2.2 + 0.8,   /* raio 0.8–3 px  */
+          speed:   Math.random() * 0.8 + 0.3,   /* velocidade de queda */
+          drift:   (Math.random() - 0.5) * 0.4, /* balanço lateral */
+          opacity: Math.random() * 0.55 + 0.15, /* levemente transparente */
+          angle:   Math.random() * Math.PI * 2,
+          angleV:  (Math.random() - 0.5) * 0.01
+        };
+      }
+
+      function init() {
+        resize();
+        flakes = Array.from({ length: COUNT }, randomFlake);
+        /* distribui pelo ecrã logo de início */
+        flakes.forEach(f => { f.y = Math.random() * H; });
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        for (const f of flakes) {
+          ctx.save();
+          ctx.globalAlpha = f.opacity;
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = '#7dd3b8';
+          ctx.shadowBlur  = 4;
+          ctx.fill();
+          ctx.restore();
+
+          /* movimento */
+          f.angle += f.angleV;
+          f.x     += f.drift + Math.sin(f.angle) * 0.3;
+          f.y     += f.speed;
+
+          /* reaparecer no topo quando sair pela base */
+          if (f.y > H + 10) {
+            f.y = -10;
+            f.x = Math.random() * W;
+          }
+          /* wrap lateral */
+          if (f.x > W + 10) f.x = -10;
+          if (f.x < -10)    f.x =  W + 10;
+        }
+        requestAnimationFrame(draw);
+      }
+
+      window.addEventListener('resize', resize);
+      init();
+      draw();
+    })();
+  </script>
 </body>
 </html>
