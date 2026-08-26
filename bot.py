@@ -268,6 +268,33 @@ def set_sales_notification_chat_id(chat_id):
 # Estado para upload de Ã­cones de serviÃ§os
 pending_icon_upload = {}
 pending_miniapp_image = {}
+
+def _pending_keys(message_or_call):
+    chat_id = None
+    user_id = None
+    if hasattr(message_or_call, 'message'):
+        chat_id = getattr(message_or_call.message.chat, 'id', None)
+        user_id = getattr(message_or_call.from_user, 'id', None)
+    else:
+        chat_id = getattr(getattr(message_or_call, 'chat', None), 'id', None)
+        user_id = getattr(getattr(message_or_call, 'from_user', None), 'id', None)
+    return [str(value) for value in (user_id, chat_id) if value is not None]
+
+def _set_pending_miniapp_image(message_or_call, state):
+    for key in _pending_keys(message_or_call):
+        pending_miniapp_image[key] = dict(state)
+
+def _get_pending_miniapp_image(message_or_call, pop=False):
+    keys = _pending_keys(message_or_call)
+    state = None
+    for key in keys:
+        if key in pending_miniapp_image:
+            state = pending_miniapp_image[key]
+            break
+    if pop and state is not None:
+        for key in keys:
+            pending_miniapp_image.pop(key, None)
+    return state
 # Estado para ediÃ§Ã£o de textos (arquivo -> aguardando novo conteÃ©do)
 pending_text_edit = {}
 pending_button_edit = {}
@@ -1342,7 +1369,7 @@ def cmd_icone_upload(message):
 @bot.message_handler(content_types=['photo', 'document'])
 def receber_icone_upload(message):
     user_id = message.from_user.id
-    if user_id in pending_miniapp_image:
+    if _get_pending_miniapp_image(message):
         salvar_upload_imagem_miniapp(message)
         return
 
@@ -4401,7 +4428,7 @@ def mostrar_acoes_imagem_miniapp(message, produto):
         bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
 
 def perguntar_link_imagem_miniapp(message, produto):
-    pending_miniapp_image[message.from_user.id] = {'mode': 'link', 'produto': produto}
+    _set_pending_miniapp_image(message, {'mode': 'link', 'produto': produto})
     bot.send_message(
         message.chat.id,
         f'Envie o link da imagem para:\n<code>{html.escape(produto)}</code>\n\nUse /cancelar para abortar.',
@@ -4417,7 +4444,7 @@ def salvar_link_imagem_miniapp(message):
     if getattr(message, 'content_type', '') in ('photo', 'document'):
         salvar_upload_imagem_miniapp(message)
         return
-    state = pending_miniapp_image.pop(message.from_user.id, None)
+    state = _get_pending_miniapp_image(message, pop=True)
     if not state or state.get('mode') != 'link':
         return
     link = (message.text or '').strip()
@@ -4432,7 +4459,7 @@ def salvar_link_imagem_miniapp(message):
     bot.reply_to(message, f'✅ Imagem salva por link.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
 
 def pedir_upload_imagem_miniapp(message, produto):
-    pending_miniapp_image[message.from_user.id] = {'mode': 'upload', 'produto': produto}
+    _set_pending_miniapp_image(message, {'mode': 'upload', 'produto': produto})
     msg = bot.send_message(
         message.chat.id,
         f'Agora envie a foto ou documento de imagem para:\n<code>{html.escape(produto)}</code>',
@@ -4444,12 +4471,12 @@ def salvar_upload_imagem_miniapp(message):
     if not _admin_only(message):
         bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
         return
-    state = pending_miniapp_image.pop(message.from_user.id, None)
+    state = _get_pending_miniapp_image(message, pop=True)
     if not state:
         bot.reply_to(message, 'Nenhuma imagem da Mini App estava aguardando upload. Abra o painel e tente novamente.')
         return
     if message.content_type not in ('photo', 'document'):
-        pending_miniapp_image[message.from_user.id] = state
+        _set_pending_miniapp_image(message, state)
         bot.reply_to(message, 'Envie uma foto ou um documento de imagem.')
         return
 
@@ -4464,7 +4491,7 @@ def salvar_upload_imagem_miniapp(message):
         else:
             doc = message.document
             if doc.mime_type and not str(doc.mime_type).startswith('image/'):
-                pending_miniapp_image[message.from_user.id] = state
+                _set_pending_miniapp_image(message, state)
                 bot.reply_to(message, 'Esse documento não parece ser uma imagem. Envie JPG, PNG ou WEBP.')
                 return
             if doc.file_name and '.' in doc.file_name:
