@@ -1,52 +1,94 @@
+import os
 import subprocess
 import sys
 import time
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = os.path.join(BASE_DIR, 'settings', 'credenciais.json')
+
 
 def auto_update():
     try:
-        subprocess.run([sys.executable, 'auto_update.py'], check=False)
+        subprocess.run([sys.executable, 'auto_update.py'], cwd=BASE_DIR, check=False)
     except Exception as exc:
-        print(f"Falha ao executar auto-update: {exc}")
+        print(f"[AUTO-UPDATE] Falha ao executar: {exc}")
 
 
-def start_scripts():
-    try:
-        auto_update()
+def iniciar_api():
+    return subprocess.Popen(
+        [sys.executable, 'api_catalogo.py'],
+        cwd=BASE_DIR
+    )
 
-        # Inicia a API HTTP de catálogo (porta 80 — obrigatório SquareCloud)
-        api_process = subprocess.Popen([sys.executable, 'api_catalogo.py'])
-        print("API de catálogo iniciada (porta 80).")
 
-        # Inicia o bot principal
-        bot_process = subprocess.Popen([sys.executable, 'bot.py'])
-        print("Bot principal iniciado.")
+def iniciar_bot():
+    return subprocess.Popen(
+        [sys.executable, 'bot.py'],
+        cwd=BASE_DIR
+    )
 
-        # Inicia atualização de usernames em background
-        update_process = subprocess.Popen([sys.executable, 'update_usernames.py'])
-        print("Script de atualização de usernames iniciado.")
 
-        # Aguarda qualquer processo finalizar; se um cair, encerra todos
-        processos = [api_process, bot_process, update_process]
-        while True:
-            for proc in processos:
-                ret = proc.poll()
-                if ret is not None:
-                    print(f"Processo {proc.args} finalizou (código {ret}). Encerrando todos...")
-                    for p in processos:
-                        if p.poll() is None:
-                            p.terminate()
-                    return
-            time.sleep(2)
+def iniciar_atualizador_usernames():
+    return subprocess.Popen(
+        [sys.executable, 'update_usernames.py'],
+        cwd=BASE_DIR
+    )
 
-    except KeyboardInterrupt:
-        print("Encerrando processos...")
-        for p in [api_process, bot_process, update_process]:
+
+def credenciais_disponiveis():
+    return os.path.isfile(CREDENTIALS_FILE)
+
+
+def encerrar(processos):
+    for processo in processos:
+        if processo and processo.poll() is None:
             try:
-                p.terminate()
+                processo.terminate()
             except Exception:
                 pass
 
 
-if __name__ == "__main__":
+def start_scripts():
+    processos = []
+    try:
+        auto_update()
+
+        # O site permanece disponível mesmo se faltar o arquivo privado do bot.
+        api_process = iniciar_api()
+        processos.append(api_process)
+        print('[MINIAPP] API/site iniciado na porta 80.')
+
+        if not credenciais_disponiveis():
+            print('ERRO DE CONFIGURAÇÃO: settings/credenciais.json não foi encontrado.')
+            print('Envie esse arquivo privado para a pasta settings/ da aplicação SquareCloud.')
+            print('Use settings/credenciais.example.json apenas como modelo; nunca o use com os placeholders.')
+            print('O site ficará online, mas o bot não será iniciado até as credenciais serem enviadas.')
+            while api_process.poll() is None:
+                time.sleep(5)
+            return
+
+        bot_process = iniciar_bot()
+        processos.append(bot_process)
+        print('[BOT] Bot principal iniciado.')
+
+        usernames_process = iniciar_atualizador_usernames()
+        processos.append(usernames_process)
+        print('[USERS] Atualizador de usernames iniciado.')
+
+        while True:
+            for processo in processos:
+                retorno = processo.poll()
+                if retorno is not None:
+                    print(f'[START] Processo finalizou com código {retorno}. Encerrando os demais.')
+                    encerrar(processos)
+                    return
+            time.sleep(2)
+
+    except KeyboardInterrupt:
+        print('[START] Encerrando processos...')
+    finally:
+        encerrar(processos)
+
+
+if __name__ == '__main__':
     start_scripts()

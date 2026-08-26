@@ -1,0 +1,38 @@
+{
+  "maintance": "off",
+  "version": "8.8.3",
+  "id_dono": "COLOQUE_SEU_ID_TELEGRAM",
+  "user_bot": "https://t.me/SEU_BOT",
+  "bot_reserva_url": "",
+  "grupo_reserva_url": "",
+  "grupo_reserva_id": 0,
+  "bot_reserva_verificacao": "off",
+  "service_emoji_pack_link": "",
+  "service_emoji_pack_name": "",
+  "service_emoji_ids": [],
+  "service_emoji_map": {},
+  "api-bot": "COLOQUE_O_TOKEN_DO_BOT",
+  "token_mp": "COLOQUE_O_TOKEN_DO_MERCADO_PAGO",
+  "separador": "/",
+  "afiliados": "off",
+  "bonus_pix": 0,
+  "bonus_pix_min": 0,
+  "bonus_registro": 0,
+  "min_pix": 1,
+  "max_pix": 10000,
+  "expiracao_pix": 30,
+  "status_pix_manu": "off",
+  "status_pix_auto": "off",
+  "link_suporte": "https://t.me/SEU_SUPORTE",
+  "pontos_by_indicate_buy": 0,
+  "min_points_saldo": 0,
+  "multiplicador_pontos": 1,
+  "modo_exibicao": "lista_direta",
+  "vencimento_bot": "01/01/2099",
+  "gateway_pagamento": {
+    "misticpay": {
+      "client_id": "",
+      "client_secret": ""
+    }
+  }
+}
