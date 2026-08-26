@@ -4,4 +4,4 @@ MEMORY=512
 VERSION=recommended
 AUTORESTART=true
 MAIN=start.py
-SUBDOMAIN=ramonatualiza
+SUBDOMAIN=vendasdoramon
