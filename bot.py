@@ -1987,7 +1987,20 @@ def publicar_miniapp_no_git(motivo):
         if status.returncode != 0:
             return False, (status.stderr or status.stdout or 'Git não disponível nessa pasta.').strip()
         if not status.stdout.strip():
-            return True, 'Nenhuma mudança nova para publicar.'
+            ahead = subprocess.run(
+                ['git', 'rev-list', '--count', '@{u}..HEAD'],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            ahead_count = int((ahead.stdout or '0').strip() or 0) if ahead.returncode == 0 else 0
+            if ahead_count > 0:
+                push = subprocess.run(['git', 'push', 'origin', 'main'], cwd=BASE_DIR, capture_output=True, text=True, check=False)
+                if push.returncode != 0:
+                    return False, (push.stderr or push.stdout or 'Falha ao enviar commits pendentes para o Git.').strip()
+                return True, f'Publicado no GitHub ({ahead_count} commit pendente enviado).'
+            return True, 'Imagem já estava salva localmente, mas não houve alteração nova para publicar.'
         commit_msg = f'Update Mini App service images: {motivo}'[:120]
         commit = subprocess.run(['git', 'commit', '-m', commit_msg], cwd=BASE_DIR, capture_output=True, text=True, check=False)
         if commit.returncode != 0:
@@ -4463,7 +4476,12 @@ def salvar_link_imagem_miniapp(message):
     _save_miniapp_images(image_map)
     atualizar_catalogo_miniapp()
     ok, detalhe = publicar_miniapp_no_git(f'imagem {state["produto"]}')
-    bot.reply_to(message, f'✅ Imagem salva por link.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
+    resposta = (
+        f'✅ Imagem salva por link para <b>{html.escape(state["produto"])}</b>.\n'
+        f'Link: <code>{html.escape(link)}</code>\n\n'
+        f'{html.escape(detalhe)}'
+    )
+    bot.reply_to(message, resposta, parse_mode='HTML')
 
 def pedir_upload_imagem_miniapp(message, produto):
     _set_pending_miniapp_image(message, {'mode': 'upload', 'produto': produto})
@@ -4518,7 +4536,12 @@ def salvar_upload_imagem_miniapp(message):
         _save_miniapp_images(image_map)
         atualizar_catalogo_miniapp()
         ok, detalhe = publicar_miniapp_no_git(f'imagem {produto}')
-        bot.reply_to(message, f'✅ Imagem salva.\n{detalhe}' if ok else f'✅ Imagem salva localmente, mas não consegui publicar no Git:\n{detalhe}')
+        resposta = (
+            f'✅ Imagem salva para <b>{html.escape(produto)}</b>.\n'
+            f'Caminho: <code>assets/service-images/{html.escape(filename)}</code>\n\n'
+            f'{html.escape(detalhe)}'
+        )
+        bot.reply_to(message, resposta, parse_mode='HTML')
     except Exception as e:
         bot.reply_to(message, f'Erro ao salvar imagem da Mini App: {e}')
     bt = InlineKeyboardButton('Sistema de Indicação: OFF', callback_data='mudar_status_afiliados')
