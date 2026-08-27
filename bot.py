@@ -4463,6 +4463,34 @@ def pesquisar_estoque_admin(message):
         texto += "\n\nMostrei os 30 primeiros resultados. Pesquise algo mais especÃ­fico se precisar."
     bot.reply_to(message, texto, parse_mode='HTML')
 
+def aplicar_cashback_vip(user_id, valor):
+    try:
+        resultado = api.ClubeVIP.registrar_compra(user_id, valor)
+        cashback = float(resultado.get('cashback', 0) or 0)
+        if resultado.get('ativo') and cashback > 0:
+            bot.send_message(
+                user_id,
+                (
+                    f"👑 <b>Cashback VIP recebido!</b>\n\n"
+                    f"• Nível: <b>{html.escape(str(resultado.get('nivel', 'VIP')))}</b>\n"
+                    f"• Cashback: <b>R$ {cashback:.2f}</b>\n"
+                    f"• Já caiu no seu saldo."
+                ),
+                parse_mode='HTML'
+            )
+    except Exception as error:
+        print(f"[VIP] Erro ao aplicar cashback: {error}")
+
+def mostrar_clube_vip(call):
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton(api.Botoes.voltar(), callback_data='perfil'))
+    bot.send_message(
+        call.message.chat.id,
+        api.ClubeVIP.texto_status(call.from_user.id),
+        parse_mode='HTML',
+        reply_markup=markup
+    )
+
 def configurar_logins(message):
     """
     Exibe o menu de configuraÃ§Ã£o de logins com uma interface melhorada.
@@ -6469,6 +6497,7 @@ def perfil(call):
     markup = InlineKeyboardMarkup()
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
+    markup.add(InlineKeyboardButton(botao_personalizado('clube_vip', '👑 CLUBE VIP'), callback_data='clube_vip'))
     markup.add(InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
@@ -6987,6 +7016,7 @@ def entregar_carrinho(message, nome, valor, email, senha, descricao, duracao):
 
     # Adicionar ao histÃ©rico
     api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha)
+    aplicar_cashback_vip(message.chat.id, valor)
 
     # Enviar login para o cliente
     bot.send_message(message.chat.id, texto, parse_mode='HTML')
@@ -7292,6 +7322,7 @@ def entregar(message, nome, valor, email, senha, descricao, duracao):
 
    
     api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha)
+    aplicar_cashback_vip(message.chat.id, valor)
 
  
     try:
@@ -8022,6 +8053,7 @@ def entregar_inline_mesmo_formato(user_id, nome, valor, email, senha, descricao,
 
     
     api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha)
+    aplicar_cashback_vip(user_id, valor)
 
    
     user_data = api.load_user_data(user_id) or {}
@@ -8085,6 +8117,7 @@ def entregar_inline(user_id, nome, valor, email, senha, descricao, duracao):
 
      
     api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha)
+    aplicar_cashback_vip(user_id, valor)
 
    
     user_data = api.load_user_data(user_id) or {}
@@ -9361,6 +9394,11 @@ def callback_query(call):
 
     if call.data == 'indique_ganhe':
         mostrar_indique_ganhe(call)
+        bot.answer_callback_query(call.id)
+        return
+
+    if call.data == 'clube_vip':
+        mostrar_clube_vip(call)
         bot.answer_callback_query(call.id)
         return
         

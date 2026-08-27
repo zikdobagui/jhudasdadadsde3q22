@@ -23,6 +23,19 @@ DEFAULT_DATABASE_FILES = {
     'database/reserve_verified.json': {},
     'database/users.json': {"users": []},
 }
+
+VIP_CONFIG_PATH = 'settings/vip.json'
+DEFAULT_VIP_CONFIG = {
+    "ativo": True,
+    "ciclo": "mensal",
+    "niveis": [
+        {"nome": "👶 INICIANTE", "minimo": 0, "cashback": 0},
+        {"nome": "🥉 BRONZE", "minimo": 1, "cashback": 1},
+        {"nome": "🥈 PRATA", "minimo": 50, "cashback": 2},
+        {"nome": "🥇 OURO", "minimo": 150, "cashback": 3},
+        {"nome": "💎 DIAMANTE", "minimo": 300, "cashback": 5}
+    ]
+}
 DEFAULT_TEXT_FILES = {
     'log/registro.txt': (
         "👤 <b>NOVO USUÁRIO REGISTRADO</b>\n\n"
@@ -777,6 +790,130 @@ class MudancaHistorico():
         if user_data:
             user_data["pontos_indicado"] = 0
             save_user_data(id, user_data)
+
+class ClubeVIP():
+    @staticmethod
+    def config():
+        os.makedirs(os.path.dirname(VIP_CONFIG_PATH), exist_ok=True)
+        if not os.path.exists(VIP_CONFIG_PATH):
+            with open_utf8(VIP_CONFIG_PATH, 'w') as f:
+                json.dump(DEFAULT_VIP_CONFIG, f, indent=4, ensure_ascii=False)
+            return DEFAULT_VIP_CONFIG.copy()
+        try:
+            with open_utf8(VIP_CONFIG_PATH, 'r') as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError
+        except Exception:
+            data = DEFAULT_VIP_CONFIG.copy()
+        data.setdefault("ativo", True)
+        data.setdefault("ciclo", "mensal")
+        if not isinstance(data.get("niveis"), list) or not data["niveis"]:
+            data["niveis"] = DEFAULT_VIP_CONFIG["niveis"]
+        data["niveis"] = sorted(data["niveis"], key=lambda item: float(item.get("minimo", 0)))
+        return data
+
+    @staticmethod
+    def ciclo_atual():
+        now = datetime.datetime.now(pytz.timezone("America/Sao_Paulo"))
+        return now.strftime("%Y-%m")
+
+    @staticmethod
+    def _vip_data(user_data):
+        vip = user_data.setdefault("vip", {})
+        ciclo = ClubeVIP.ciclo_atual()
+        if vip.get("ciclo") != ciclo:
+            vip["ciclo"] = ciclo
+            vip["gasto_ciclo"] = 0.0
+        vip.setdefault("gasto_ciclo", 0.0)
+        vip.setdefault("cashback_total", 0.0)
+        return vip
+
+    @staticmethod
+    def nivel_por_gasto(gasto):
+        niveis = ClubeVIP.config().get("niveis", [])
+        atual = niveis[0] if niveis else {"nome": "INICIANTE", "minimo": 0, "cashback": 0}
+        proximo = None
+        for nivel in niveis:
+            if float(gasto) >= float(nivel.get("minimo", 0)):
+                atual = nivel
+            elif proximo is None:
+                proximo = nivel
+        return atual, proximo
+
+    @staticmethod
+    def registrar_compra(user_id, valor):
+        config = ClubeVIP.config()
+        if not config.get("ativo", True):
+            return {"ativo": False, "cashback": 0.0}
+
+        user_data = load_user_data(user_id)
+        if not user_data:
+            return {"ativo": False, "cashback": 0.0}
+
+        valor = float(valor)
+        vip = ClubeVIP._vip_data(user_data)
+        gasto_antes = float(vip.get("gasto_ciclo", 0))
+        nivel, _ = ClubeVIP.nivel_por_gasto(gasto_antes)
+        percentual = float(nivel.get("cashback", 0))
+        cashback = round(valor * percentual / 100, 2)
+
+        vip["gasto_ciclo"] = round(gasto_antes + valor, 2)
+        if cashback > 0:
+            user_data["saldo"] = round(float(user_data.get("saldo", 0)) + cashback, 2)
+            vip["cashback_total"] = round(float(vip.get("cashback_total", 0)) + cashback, 2)
+        save_user_data(user_id, user_data)
+
+        return {
+            "ativo": True,
+            "cashback": cashback,
+            "percentual": percentual,
+            "nivel": nivel.get("nome", "INICIANTE"),
+            "gasto_ciclo": vip["gasto_ciclo"],
+            "cashback_total": vip["cashback_total"]
+        }
+
+    @staticmethod
+    def status(user_id):
+        user_data = load_user_data(user_id) or {}
+        vip = ClubeVIP._vip_data(user_data)
+        gasto = float(vip.get("gasto_ciclo", 0))
+        total = float(vip.get("cashback_total", 0))
+        nivel, proximo = ClubeVIP.nivel_por_gasto(gasto)
+        faltam = max(0, float(proximo.get("minimo", 0)) - gasto) if proximo else 0
+        return {
+            "ativo": ClubeVIP.config().get("ativo", True),
+            "nivel": nivel,
+            "proximo": proximo,
+            "gasto_ciclo": gasto,
+            "cashback_total": total,
+            "faltam": faltam
+        }
+
+    @staticmethod
+    def texto_status(user_id):
+        status = ClubeVIP.status(user_id)
+        nivel = status["nivel"]
+        proximo = status["proximo"]
+        texto = (
+            "👑 <b>CLUBE DE REVENDEDORES VIP</b> 👑\n\n"
+            "A cada compra, você acumula gastos.\n"
+            "Quanto maior o seu nível, maior o Cashback que volta para sua carteira!\n\n"
+            "📊 <b>SEU STATUS DESTE CICLO:</b>\n"
+            f"├ Nível Atual: <b>{html.escape(str(nivel.get('nome', 'INICIANTE')))}</b>\n"
+            f"├ Gasto no Ciclo: <b>R$ {status['gasto_ciclo']:.2f}</b>\n"
+            f"├ Cashback Atual: <b>{float(nivel.get('cashback', 0)):.0f}%</b>\n"
+            f"└ Total ganho no bot: <b>R$ {status['cashback_total']:.2f}</b>\n"
+        )
+        if proximo:
+            texto += (
+                f"\n🚀 <b>PRÓXIMO NÍVEL:</b> {html.escape(str(proximo.get('nome', '')))}\n"
+                f"Faltam apenas <b>R$ {status['faltam']:.2f}</b> em compras neste ciclo "
+                f"para desbloquear <b>{float(proximo.get('cashback', 0)):.0f}%</b> de Cashback!"
+            )
+        else:
+            texto += "\n💎 Você já está no maior nível deste ciclo!"
+        return texto
 
 class GiftCard():
     def validar_gift(codigo):

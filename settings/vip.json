@@ -1,0 +1,31 @@
+{
+    "ativo": true,
+    "ciclo": "mensal",
+    "niveis": [
+        {
+            "nome": "👶 INICIANTE",
+            "minimo": 0,
+            "cashback": 0
+        },
+        {
+            "nome": "🥉 BRONZE",
+            "minimo": 1,
+            "cashback": 1
+        },
+        {
+            "nome": "🥈 PRATA",
+            "minimo": 50,
+            "cashback": 2
+        },
+        {
+            "nome": "🥇 OURO",
+            "minimo": 150,
+            "cashback": 3
+        },
+        {
+            "nome": "💎 DIAMANTE",
+            "minimo": 300,
+            "cashback": 5
+        }
+    ]
+}
