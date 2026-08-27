@@ -2113,6 +2113,7 @@ def atualizar_catalogo_miniapp():
         nome = acesso['nome']
         if nome not in agrupados:
             agrupados[nome] = {
+                'id': service_callback_token(nome),
                 'name': nome,
                 'price': float(acesso['valor']),
                 'stock': 0
@@ -2176,8 +2177,23 @@ def _miniapp_product_by_index(index):
         return produtos[index]
     return ''
 
+def _miniapp_product_by_id(product_id, catalogo=None):
+    product_id = str(product_id or '').strip()
+    if not product_id:
+        return ''
+
+    catalogo = catalogo if catalogo is not None else carregar_catalogo_miniapp()
+    for produto in catalogo:
+        nome = str(produto.get('name') or '').strip()
+        if produto.get('id') == product_id or service_callback_token(nome) == product_id:
+            return nome
+
+    return resolve_service_callback_token(product_id) or ''
+
 def importar_carrinho_miniapp_start(message, payload):
-    if len(payload or '') > 64 or not re.fullmatch(r'mc_(?:\d+x\d+)(?:_\d+x\d+)*', payload or ''):
+    if len(payload or '') > 64:
+        return False
+    if not re.fullmatch(r'mc_(?:(?:\d+|[a-f0-9]{16})x\d+)(?:_(?:\d+|[a-f0-9]{16})x\d+)*', payload or ''):
         return False
 
     catalogo = carregar_catalogo_miniapp()
@@ -2187,13 +2203,19 @@ def importar_carrinho_miniapp_start(message, payload):
 
     solicitados = {}
     for item in payload[3:].split('_'):
-        idx_text, qtd_text = item.split('x', 1)
-        idx = int(idx_text)
+        produto_ref, qtd_text = item.split('x', 1)
         quantidade = int(qtd_text)
-        if idx < 0 or idx >= len(catalogo) or quantidade < 1 or quantidade > 10:
+        if quantidade < 1 or quantidade > 10:
             bot.send_message(message.chat.id, 'Carrinho inválido. Abra a loja e tente novamente.')
             return True
-        servico = str(catalogo[idx].get('name') or '').strip()
+        if produto_ref.isdigit():
+            idx = int(produto_ref)
+            if idx < 0 or idx >= len(catalogo):
+                bot.send_message(message.chat.id, 'Carrinho inválido. Abra a loja e tente novamente.')
+                return True
+            servico = str(catalogo[idx].get('name') or '').strip()
+        else:
+            servico = _miniapp_product_by_id(produto_ref, catalogo)
         if not servico:
             bot.send_message(message.chat.id, 'Um produto do carrinho não foi encontrado.')
             return True

@@ -135,11 +135,11 @@ document.querySelector('#closeCart').addEventListener('click', () => showCart(fa
 document.querySelector('#closeCartIcon').addEventListener('click', () => showCart(false));
 checkout.addEventListener('click', () => {
   const items = [...state.cart.entries()].map(([servico, quantidade]) => {
-    const idx = state.products.findIndex((product) => product.name === servico);
-    return `${idx}x${quantidade}`;
+    const product = state.products.find((item) => item.name === servico);
+    return `${product?.id || ''}x${quantidade}`;
   });
   if (!items.length) return;
-  if (items.some((item) => item.startsWith('-1x'))) {
+  if (items.some((item) => item.startsWith('x'))) {
     return showToast('Atualize a loja e tente novamente');
   }
   const startPayload = `mc_${items.join('_')}`;
