@@ -29,6 +29,7 @@ import html
 import zipfile
 import shutil
 import urllib.parse
+import hashlib
 import central as api
 import pytz
 from io import BytesIO
@@ -39,6 +40,27 @@ from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 from datetime import timezone
 from pytz import timezone
 from database import get_user_balance, add_saldo, add_pagamento, get_top_users
+
+def service_callback_token(servico):
+    return hashlib.sha1(str(servico).strip().casefold().encode('utf-8')).hexdigest()[:16]
+
+def resolve_service_callback_token(token):
+    token = str(token or '').strip()
+    vistos = set()
+    try:
+        for acesso in api.ControleLogins.pegar_servicos():
+            nome = str(acesso.get('nome', '')).strip()
+            if not nome or nome in vistos:
+                continue
+            vistos.add(nome)
+            if service_callback_token(nome) == token:
+                return nome
+    except Exception as error:
+        print(f"[SERVICO] Erro ao resolver token {token}: {error}")
+    return None
+
+def service_callback_data(prefixo, servico):
+    return f"{prefixo}|{service_callback_token(servico)}"
 
 # Compatibilidade com versoes do pyTelegramBotAPI que ainda nao serializam
 # style/icon_custom_emoji_id, embora esses campos ja existam na Bot API.
@@ -6771,7 +6793,7 @@ def servicos_por_categoria(message, categoria):
             valor = servico["valor"]
              
             markup.add(configure_service_button(
-                InlineKeyboardButton(service_button_text(nome, valor), callback_data=f"exibir_servico {nome}"),
+                InlineKeyboardButton(service_button_text(nome, valor), callback_data=service_callback_data("exibir_servico", nome)),
                 nome
             ))
      
@@ -6813,7 +6835,7 @@ def servicos(message):
             nome = servico["nome"]
             valor = servico["valor"]
             lista.append((nome, configure_service_button(
-                InlineKeyboardButton(service_button_text(nome, valor), callback_data=f'exibir_servico {nome}'),
+                InlineKeyboardButton(service_button_text(nome, valor), callback_data=service_callback_data("exibir_servico", nome)),
                 nome
             )))
             ja_foram.append(nome)
@@ -6836,9 +6858,9 @@ def servicos(message):
 
 def exibir_servico(message, servico):
     texto, email = api.Textos.exibir_servico(message, servico)
-    bt_comprar = configure_service_button(InlineKeyboardButton(f'{api.Botoes.comprar_login()}', callback_data=f'comprar {servico}'), servico)
-    bt_comprar_qtd = configure_service_button(InlineKeyboardButton("â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ â€¢â€¢ â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ â€¢", callback_data=f'comprar_qtd {servico}'), servico)
-    bt_carrinho = InlineKeyboardButton("â€¢ ADICIONAR AO CARRINHO", callback_data=f'add_carrinho {servico}')
+    bt_comprar = configure_service_button(InlineKeyboardButton(f'{api.Botoes.comprar_login()}', callback_data=service_callback_data("comprar", servico)), servico)
+    bt_comprar_qtd = configure_service_button(InlineKeyboardButton("â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ â€¢â€¢ â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ â€¢", callback_data=service_callback_data("comprar_qtd", servico)), servico)
+    bt_carrinho = InlineKeyboardButton("â€¢ ADICIONAR AO CARRINHO", callback_data=service_callback_data("add_carrinho", servico))
 #   bt_addsaldo = InlineKeyboardButton(f'{api.Botoes.addsaldo()}', callback_data='addsaldo')
     bt_voltar = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='servicos')
     markup = InlineKeyboardMarkup([[bt_comprar], [bt_comprar_qtd], [bt_carrinho], [bt_voltar]])
@@ -6893,11 +6915,14 @@ def exibir_servico(message, servico):
 @bot.callback_query_handler(func=lambda c: c.data.startswith("comprar_qtd"))
 def callback_comprar_qtd(call):
    
-    parts = call.data.split(maxsplit=1)
-    if len(parts) < 2:
+    if call.data.startswith("comprar_qtd|"):
+        servico = resolve_service_callback_token(call.data.split('|', 1)[1])
+    else:
+        parts = call.data.split(maxsplit=1)
+        servico = parts[1] if len(parts) >= 2 else None
+    if not servico:
         bot.answer_callback_query(call.id, "ServiÃ©o nÃ£o especificado.", show_alert=True)
         return
-    servico = parts[1]
     
     # Perguntar o que fazer: adicionar ao carrinho ou comprar direto
     texto = f"â€¢ <b>COMPRAR NA QUANTIDADE</b>\n\n"
@@ -6905,9 +6930,9 @@ def callback_comprar_qtd(call):
     texto += "O que deseja fazer?"
     
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton('â€¢ Adicionar ao Carrinho', callback_data=f'qtd_carrinho_ask|{servico}'))
-    markup.row(InlineKeyboardButton('â€¢ Comprar Direto', callback_data=f'qtd_comprar_ask|{servico}'))
-    markup.row(InlineKeyboardButton('â€¢ Voltar', callback_data=f'exibir_servico {servico}'))
+    markup.row(InlineKeyboardButton('â€¢ Adicionar ao Carrinho', callback_data=service_callback_data("qtd_carrinho_ask", servico)))
+    markup.row(InlineKeyboardButton('â€¢ Comprar Direto', callback_data=service_callback_data("qtd_comprar_ask", servico)))
+    markup.row(InlineKeyboardButton('â€¢ Voltar', callback_data=service_callback_data("exibir_servico", servico)))
     
     try:
         bot.edit_message_text(
@@ -7861,7 +7886,7 @@ def inline_search_logins(inline_query):
         )
 
         # BotÃ©es
-        buy_btn = types.InlineKeyboardButton("Comprar", callback_data=f"comprarInline {nome}")
+        buy_btn = types.InlineKeyboardButton("Comprar", callback_data=service_callback_data("comprarInline", nome))
         cancel_btn = types.InlineKeyboardButton("Cancelar", callback_data="cancelarInline")
         kb = types.InlineKeyboardMarkup([[buy_btn, cancel_btn]])
 
@@ -7899,10 +7924,21 @@ def inline_search_logins(inline_query):
     bot.answer_inline_query(inline_query.id, results, cache_time=1)
 
 
-@bot.callback_query_handler(func=lambda c: c.data.startswith("comprarInline "))
+@bot.callback_query_handler(func=lambda c: c.data.startswith("comprarInline ") or c.data.startswith("comprarInline|"))
 def callback_comprar_inline(call):
-    nome_servico = call.data.replace("comprarInline ", "").strip()
+    if call.data.startswith("comprarInline|"):
+        nome_servico = resolve_service_callback_token(call.data.split('|', 1)[1])
+    else:
+        nome_servico = call.data.replace("comprarInline ", "").strip()
     user_id = call.from_user.id
+
+    if not nome_servico:
+        bot.answer_callback_query(
+            call.id,
+            "ServiÃ§o esgotado ou nÃ£o encontrado!",
+            show_alert=True
+        )
+        return
 
     
     resultado_peek = api.ControleLogins.peek_primeiro_disponivel(nome_servico)
@@ -9076,7 +9112,7 @@ def callback_query(call):
     
     # Perguntar quantidade para adicionar ao carrinho
     if call.data.startswith('qtd_carrinho_ask|'):
-        servico = call.data.split('|')[1]
+        servico = resolve_service_callback_token(call.data.split('|', 1)[1]) or call.data.split('|', 1)[1]
         user_id = call.from_user.id
         
         # Marcar que estÃ© esperando quantidade
@@ -9092,7 +9128,7 @@ def callback_query(call):
     
     # Perguntar quantidade para comprar direto
     if call.data.startswith('qtd_comprar_ask|'):
-        servico = call.data.split('|')[1]
+        servico = resolve_service_callback_token(call.data.split('|', 1)[1]) or call.data.split('|', 1)[1]
         msg = bot.send_message(
             call.message.chat.id,
             f"Quantos logins de {servico} vocÃ© deseja comprar?",
@@ -9103,8 +9139,14 @@ def callback_query(call):
         return
     
     # Adicionar ao carrinho
-    if call.data.startswith('add_carrinho '):
-        servico = call.data.replace('add_carrinho ', '')
+    if call.data.startswith('add_carrinho|') or call.data.startswith('add_carrinho '):
+        if call.data.startswith('add_carrinho|'):
+            servico = resolve_service_callback_token(call.data.split('|', 1)[1])
+        else:
+            servico = call.data.replace('add_carrinho ', '')
+        if not servico:
+            bot.answer_callback_query(call.id, "ServiÃ©o esgotado ou nÃ£o encontrado!", show_alert=True)
+            return
         user_id = call.from_user.id
         
         # Pegar valor do serviÃ§o
@@ -9453,12 +9495,24 @@ def callback_query(call):
             bot.register_next_step_handler(call.message, pix_auto)
 
     # =============== Menu serviÃ§os
-    if call.data.split()[0] == 'exibir_servico':
-        nome = call.data.split()[1:]
-        nome = ' '.join(nome)
+    if call.data.startswith('exibir_servico|') or call.data.split()[0] == 'exibir_servico':
+        if call.data.startswith('exibir_servico|'):
+            nome = resolve_service_callback_token(call.data.split('|', 1)[1])
+        else:
+            nome = call.data.split()[1:]
+            nome = ' '.join(nome)
+        if not nome:
+            bot.answer_callback_query(call.id, "ServiÃ§o esgotado ou nÃ£o encontrado!", show_alert=True)
+            return
         exibir_servico(call.message, nome)
-    if call.data.split()[0] == 'comprar':
-        servico = call.data.replace('comprar', '').strip()
+    if call.data.startswith('comprar|') or call.data.split()[0] == 'comprar':
+        if call.data.startswith('comprar|'):
+            servico = resolve_service_callback_token(call.data.split('|', 1)[1])
+        else:
+            servico = call.data.replace('comprar', '').strip()
+        if not servico:
+            bot.answer_callback_query(call.id, "ServiÃ§o esgotado ou nÃ£o encontrado!", show_alert=True)
+            return
          
         resultado_peek = api.ControleLogins.peek_primeiro_disponivel(servico)
         if not resultado_peek:
