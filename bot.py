@@ -334,6 +334,7 @@ pending_description_edit = {}
 # Estado para adicionar quantidade ao carrinho
 pending_carrinho_qtd = {}
 pending_duplicate_logins = {}
+pending_vip_level_edit = {}
 # Estado para adicionar notificaÃ§Ã£o de reabastecimento
 pending_notif_reabast = {}
 # Compras aguardando aceite dos termos antes de descontar saldo/entregar
@@ -1732,7 +1733,8 @@ def painel_admin(message):
         markup.row(InlineKeyboardButton(f'{lock} Configurar Logins', callback_data='configurar_logins'),
                    InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
         markup.row(InlineKeyboardButton(f'{handshake} Configurar Afiliados', callback_data='configurar_afiliados'),
-                   InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
+                   InlineKeyboardButton('👑 Clube VIP', callback_data='admin_vip'))
+        markup.row(InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
         markup.row(InlineKeyboardButton(f'{megaphone} Notificacoes Fake', callback_data='configurar_notificacoes_fake'))
         markup.row(InlineKeyboardButton(f'{memo} Editar Textos', callback_data='editar_textos'),
                    InlineKeyboardButton(f'{image_icon} Gerenciar Imagens', callback_data='gerenciar_imagens'))
@@ -4490,6 +4492,65 @@ def mostrar_clube_vip(call):
         parse_mode='HTML',
         reply_markup=markup
     )
+
+def mostrar_admin_vip(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
+        return
+
+    config = api.ClubeVIP.config()
+    status = 'Ativado' if config.get('ativo', True) else 'Desativado'
+    texto = (
+        "👑 <b>CLUBE VIP - ADMIN</b>\n\n"
+        f"Status: <b>{status}</b>\n"
+        f"Ciclo: <b>{html.escape(str(config.get('ciclo', 'mensal')))}</b>\n\n"
+        "<b>Níveis configurados:</b>\n"
+    )
+    for index, nivel in enumerate(config.get('niveis', []), start=1):
+        texto += (
+            f"{index}. {html.escape(str(nivel.get('nome', 'VIP')))} - "
+            f"R$ {float(nivel.get('minimo', 0)):.2f} / "
+            f"{float(nivel.get('cashback', 0)):.2f}%\n"
+        )
+    texto += "\nPara editar um nível, toque nele e envie: <code>valor_minimo/cashback</code>"
+
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('✅ Ativar/Desativar', callback_data='vip_toggle'))
+    rows = []
+    for index, nivel in enumerate(config.get('niveis', [])):
+        rows.append(InlineKeyboardButton(
+            str(nivel.get('nome', f'Nível {index + 1}')),
+            callback_data=f'vip_edit|{index}'
+        ))
+        if len(rows) == 2:
+            markup.row(*rows)
+            rows = []
+    if rows:
+        markup.row(*rows)
+    markup.row(InlineKeyboardButton('✅ Voltar', callback_data='voltar_paineladm'))
+
+    bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def receber_edicao_nivel_vip(message):
+    state = pending_vip_level_edit.pop(message.chat.id, None)
+    if not state:
+        bot.reply_to(message, "Nenhum nível VIP aguardando edição.")
+        return
+    try:
+        partes = re.split(r'[/|;]', message.text.strip())
+        if len(partes) != 2:
+            raise ValueError
+        minimo = parse_valor_monetario(partes[0])
+        cashback = parse_valor_monetario(partes[1])
+        if cashback < 0 or cashback > 100:
+            raise ValueError
+        if not api.ClubeVIP.atualizar_nivel(state['index'], minimo, cashback):
+            bot.reply_to(message, "Nível VIP não encontrado.")
+            return
+        bot.reply_to(message, f"✅ Nível atualizado: mínimo R$ {minimo:.2f} e cashback {cashback:.2f}%.")
+        mostrar_admin_vip(message)
+    except ValueError:
+        bot.reply_to(message, "Formato inválido. Envie assim: <code>50/2</code> ou <code>50,00/2,5</code>", parse_mode='HTML')
 
 def configurar_logins(message):
     """
@@ -8864,6 +8925,49 @@ def callback_query(call):
             return
         bot.answer_callback_query(call.id)
         mostrar_admin_roleta(call.message)
+        return
+
+    if call.data == 'admin_vip':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_vip(call.message)
+        return
+
+    if call.data == 'vip_toggle':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        ativo = api.ClubeVIP.mudar_status()
+        bot.answer_callback_query(call.id, "Clube VIP ativado." if ativo else "Clube VIP desativado.", show_alert=True)
+        mostrar_admin_vip(call.message)
+        return
+
+    if call.data.startswith('vip_edit|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        try:
+            index = int(call.data.split('|', 1)[1])
+            nivel = api.ClubeVIP.config().get('niveis', [])[index]
+        except Exception:
+            bot.answer_callback_query(call.id, "Nível não encontrado.", show_alert=True)
+            return
+        pending_vip_level_edit[call.message.chat.id] = {'index': index}
+        bot.send_message(
+            call.message.chat.id,
+            (
+                f"Editando {html.escape(str(nivel.get('nome', 'VIP')))}.\n\n"
+                "Envie o valor mínimo e a porcentagem de cashback:\n"
+                "<code>50/2</code>\n\n"
+                "Também aceito quebrado: <code>50,00/2,5</code>"
+            ),
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(call.message, receber_edicao_nivel_vip)
+        bot.answer_callback_query(call.id)
         return
 
     if call.data == 'roleta_admin_toggle':

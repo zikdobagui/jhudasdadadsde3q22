@@ -814,6 +814,33 @@ class ClubeVIP():
         return data
 
     @staticmethod
+    def salvar_config(data):
+        os.makedirs(os.path.dirname(VIP_CONFIG_PATH), exist_ok=True)
+        data.setdefault("ativo", True)
+        data.setdefault("ciclo", "mensal")
+        data["niveis"] = sorted(data.get("niveis", []), key=lambda item: float(item.get("minimo", 0)))
+        with open_utf8(VIP_CONFIG_PATH, 'w') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    @staticmethod
+    def mudar_status():
+        data = ClubeVIP.config()
+        data["ativo"] = not bool(data.get("ativo", True))
+        ClubeVIP.salvar_config(data)
+        return data["ativo"]
+
+    @staticmethod
+    def atualizar_nivel(index, minimo, cashback):
+        data = ClubeVIP.config()
+        niveis = data.get("niveis", [])
+        if index < 0 or index >= len(niveis):
+            return False
+        niveis[index]["minimo"] = round(float(minimo), 2)
+        niveis[index]["cashback"] = round(float(cashback), 2)
+        ClubeVIP.salvar_config(data)
+        return True
+
+    @staticmethod
     def ciclo_atual():
         now = datetime.datetime.now(pytz.timezone("America/Sao_Paulo"))
         return now.strftime("%Y-%m")
