@@ -2312,7 +2312,7 @@ def notificar_abastecimento_estoque(abastecidos):
             + '\n\n🛒 <i>Acesse a loja e garanta o seu!</i>'
         )
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton('🛒 ABRIR LOJA', url=MINIAPP_URL))
+        markup.row(InlineKeyboardButton(botao_personalizado('abrir_loja', '🛒 ABRIR LOJA'), url=MINIAPP_URL))
         bot.send_message(
             get_sales_notification_chat_id(),
             texto,
@@ -5106,7 +5106,7 @@ def processar_lote_usuarios(
 
 def gerar_menu_principal():
     bt_miniapp = InlineKeyboardButton(
-        '🛍️ ABRIR LOJA',
+        botao_personalizado('abrir_loja', '🛍️ ABRIR LOJA'),
         web_app=types.WebAppInfo(url=MINIAPP_URL)
     )
     bt_comprar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('catalogo', 'VER CATÃLOGO'), callback_data='servicos'), 'catalogo')
@@ -5124,7 +5124,7 @@ def gerar_menu_principal():
     bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
-    bt_indique = InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe')
+    bt_indique = InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
@@ -6469,7 +6469,7 @@ def perfil(call):
     markup = InlineKeyboardMarkup()
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
-    markup.add(InlineKeyboardButton('👥 INDIQUE E GANHE', callback_data='indique_ganhe'))
+    markup.add(InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(user)
