@@ -102,7 +102,13 @@ def gerar_catalogo():
             continue
         valor = float(acesso.get('valor', 0))
         if nome not in agrupados:
-            agrupados[nome] = {'name': nome, 'price': valor, 'stock': 0}
+            agrupados[nome] = {
+                'name': nome,
+                'price': valor,
+                'stock': 0,
+                'descricao': acesso.get('descricao', ''),
+                'duracao': acesso.get('duracao', '')
+            }
         agrupados[nome]['stock'] += 1
 
     catalogo = []

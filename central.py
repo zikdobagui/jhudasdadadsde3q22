@@ -9,6 +9,7 @@ import html
 import pytz
 import os
 import threading
+import requests
 from datetime import timezone
 from database import load_user_data, save_user_data
 from pytz import timezone
@@ -1116,6 +1117,111 @@ class FuncaoTransmitir:
 class ControleLogins():
     _registry_lock = threading.RLock()
     _registry_path = 'database/login_registry.json'
+    _remote_timeout = 20
+
+    @staticmethod
+    def _remote_config():
+        try:
+            with open_utf8('settings/credenciais.json', 'r') as f:
+                data = json.load(f)
+        except Exception:
+            return None
+
+        url = str(data.get('central_stock_api_url', '')).strip().rstrip('/')
+        key = str(data.get('central_stock_api_key', '')).strip()
+        child_bot_id = str(data.get('child_bot_id', data.get('user_bot', ''))).strip()
+        if not url or not key:
+            return None
+        return {
+            'url': url,
+            'key': key,
+            'child_bot_id': child_bot_id
+        }
+
+    @classmethod
+    def usando_estoque_central(cls):
+        return cls._remote_config() is not None
+
+    @classmethod
+    def _remote_headers(cls, config):
+        return {
+            'X-Stock-Key': config['key'],
+            'Content-Type': 'application/json'
+        }
+
+    @classmethod
+    def _remote_get_stock(cls):
+        config = cls._remote_config()
+        if not config:
+            return None
+        response = requests.get(
+            f"{config['url']}/api/stock",
+            headers={'X-Stock-Key': config['key']},
+            timeout=cls._remote_timeout
+        )
+        response.raise_for_status()
+        return response.json().get('stock', [])
+
+    @classmethod
+    def _remote_reserve(cls, servico):
+        config = cls._remote_config()
+        if not config:
+            return None
+        payload = {
+            'service': servico,
+            'child_bot_id': config['child_bot_id']
+        }
+        response = requests.post(
+            f"{config['url']}/api/stock/reserve",
+            json=payload,
+            headers=cls._remote_headers(config),
+            timeout=cls._remote_timeout
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.json().get('access')
+
+    @classmethod
+    def _remote_add(cls, nome, valor, descricao, email, senha, duracao):
+        config = cls._remote_config()
+        if not config:
+            return None
+        payload = {
+            'nome': nome,
+            'valor': valor,
+            'descricao': descricao,
+            'email': email,
+            'senha': senha,
+            'duracao': duracao
+        }
+        response = requests.post(
+            f"{config['url']}/api/stock/add",
+            json=payload,
+            headers=cls._remote_headers(config),
+            timeout=cls._remote_timeout
+        )
+        response.raise_for_status()
+        return True
+
+    @staticmethod
+    def _stock_item_name(item):
+        return item.get('nome') or item.get('name') or ''
+
+    @staticmethod
+    def _stock_item_value(item):
+        return item.get('valor', item.get('price', 0))
+
+    @staticmethod
+    def _access_tuple(access):
+        return (
+            access.get('nome', ''),
+            access.get('valor', 0),
+            access.get('email', ''),
+            access.get('senha', ''),
+            access.get('descricao', ''),
+            access.get('duracao', '')
+        )
 
     @staticmethod
     def _normalizar_conta(nome, email):
@@ -1179,6 +1285,22 @@ class ControleLogins():
   
     @classmethod
     def peek_primeiro_disponivel(cls, servico: str):
+        if cls.usando_estoque_central():
+            try:
+                for item in cls._remote_get_stock() or []:
+                    nome = cls._stock_item_name(item)
+                    if nome.strip().casefold() == str(servico).strip().casefold() and int(item.get('stock', item.get('quantidade', 0))) > 0:
+                        return (
+                            nome,
+                            cls._stock_item_value(item),
+                            '',
+                            '',
+                            item.get('descricao', ''),
+                            item.get('duracao', '')
+                        )
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao consultar estoque: {exc}")
+            return None
  
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
@@ -1197,6 +1319,13 @@ class ControleLogins():
 
   
     def add_login(nome, valor, descricao, email, senha, duracao, force=False):
+        if ControleLogins.usando_estoque_central():
+            try:
+                return bool(ControleLogins._remote_add(nome, valor, descricao, email, senha, duracao))
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao adicionar acesso: {exc}")
+                return False
+
         with ControleLogins._registry_lock:
             registro = ControleLogins._carregar_registro()
             chave = ControleLogins._normalizar_conta(nome, email)
@@ -1219,6 +1348,10 @@ class ControleLogins():
             return True
     # remover login
     def remover_login(nome, email):
+        if ControleLogins.usando_estoque_central():
+            print("[ESTOQUE CENTRAL] Remocao manual por email nao esta disponivel via API.")
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1231,6 +1364,20 @@ class ControleLogins():
         return False
     # listar servicos
     def pegar_servicos():
+        if ControleLogins.usando_estoque_central():
+            try:
+                lista = []
+                for item in ControleLogins._remote_get_stock() or []:
+                    nome = ControleLogins._stock_item_name(item)
+                    valor = ControleLogins._stock_item_value(item)
+                    quantidade = int(item.get('stock', item.get('quantidade', 0)))
+                    for _ in range(max(quantidade, 0)):
+                        lista.append({"nome": nome, "valor": valor})
+                return lista
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao listar servicos: {exc}")
+                return []
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         lista = []
@@ -1239,6 +1386,16 @@ class ControleLogins():
             pass
         return lista
     def estoque_total():
+        if ControleLogins.usando_estoque_central():
+            try:
+                total = 0
+                for item in ControleLogins._remote_get_stock() or []:
+                    total += int(item.get('stock', item.get('quantidade', 0)))
+                return total
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao contar estoque: {exc}")
+                return 0
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         quantity = 0
@@ -1247,6 +1404,15 @@ class ControleLogins():
         return quantity
     # pegar estoque por nome
     def pegar_estoque(nome):
+        if ControleLogins.usando_estoque_central():
+            try:
+                for item in ControleLogins._remote_get_stock() or []:
+                    if ControleLogins._stock_item_name(item) == nome:
+                        return int(item.get('stock', item.get('quantidade', 0)))
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao consultar estoque do produto: {exc}")
+            return 0
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         quantidade = 0
@@ -1256,6 +1422,20 @@ class ControleLogins():
             pass
         return quantidade
     def pegar_estoque_detalhado():
+        if ControleLogins.usando_estoque_central():
+            try:
+                montagem = "<b>ACESSOS EM ESTOQUE:</b>\n"
+                logins = ''
+                for item in ControleLogins._remote_get_stock() or []:
+                    nome = ControleLogins._stock_item_name(item)
+                    quantidade = int(item.get('stock', item.get('quantidade', 0)))
+                    logins += f'\n{nome}: {quantidade}'
+                montagem += f"\n<code>{logins}</code>"
+                return montagem
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao montar estoque detalhado: {exc}")
+                return "<b>ACESSOS EM ESTOQUE:</b>\n\n<code>Falha ao consultar estoque central.</code>"
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         ja_foram = []
@@ -1280,6 +1460,33 @@ class ControleLogins():
         termo = str(termo or '').strip().casefold()
         if not termo:
             return []
+
+        if ControleLogins.usando_estoque_central():
+            try:
+                resultados = []
+                for item in ControleLogins._remote_get_stock() or []:
+                    nome = ControleLogins._stock_item_name(item)
+                    texto = " ".join(str(campo) for campo in (
+                        nome,
+                        item.get("descricao", ""),
+                        item.get("duracao", "")
+                    )).casefold()
+                    if termo in texto:
+                        resultados.append({
+                            "nome": nome,
+                            "valor": ControleLogins._stock_item_value(item),
+                            "descricao": item.get("descricao", ""),
+                            "email": "",
+                            "senha": "",
+                            "duracao": item.get("duracao", ""),
+                            "quantidade": item.get("stock", item.get("quantidade", 0))
+                        })
+                        if len(resultados) >= limite:
+                            break
+                return resultados
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao pesquisar estoque: {exc}")
+                return []
 
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
@@ -1311,6 +1518,10 @@ class ControleLogins():
         with open_utf8('historicos/estoque_detalhado.txt', 'rb') as file:
             return file
     def remover_por_nome(nome):
+        if ControleLogins.usando_estoque_central():
+            print("[ESTOQUE CENTRAL] Remocao por plataforma nao esta disponivel via API.")
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1322,6 +1533,10 @@ class ControleLogins():
             json.dump(data, f, indent=4)
         return True
     def zerar_estoque():
+        if ControleLogins.usando_estoque_central():
+            print("[ESTOQUE CENTRAL] Zerar estoque nao esta disponivel via API.")
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         data["acessos"] = []
@@ -1330,6 +1545,10 @@ class ControleLogins():
         return True
 
     def mudar_valor_por_nome(nome, novo_valor):
+        if ControleLogins.usando_estoque_central():
+            print("[ESTOQUE CENTRAL] Alterar valor nao esta disponivel via API.")
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1340,6 +1559,10 @@ class ControleLogins():
         with open_utf8('database/acessos.json', 'w') as f:
             json.dump(data, f, indent=4)
     def mudar_valor_de_todos(valor):
+        if ControleLogins.usando_estoque_central():
+            print("[ESTOQUE CENTRAL] Alterar todos os valores nao esta disponivel via API.")
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1348,6 +1571,16 @@ class ControleLogins():
         with open_utf8('database/acessos.json', 'w') as f:
             json.dump(data, f, indent=4)
     def pegar_info(nome):
+        if ControleLogins.usando_estoque_central():
+            try:
+                for item in ControleLogins._remote_get_stock() or []:
+                    item_nome = ControleLogins._stock_item_name(item)
+                    if item_nome == nome:
+                        return item_nome, ControleLogins._stock_item_value(item), item.get("descricao", ""), item.get("duracao", ""), ""
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao buscar informacoes do produto: {exc}")
+            return nome, "0.00", "Produto não encontrado", "30", "nao@encontrado.com"
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1386,6 +1619,16 @@ class ControleLogins():
         Se não achar nenhum, retorna None.
         Se achar, retorna (nome, valor, email, senha, descricao, duracao).
         """
+        if ControleLogins.usando_estoque_central():
+            try:
+                acesso = ControleLogins._remote_reserve(servico)
+                if not acesso:
+                    return None
+                return ControleLogins._access_tuple(acesso)
+            except Exception as exc:
+                print(f"[ESTOQUE CENTRAL] Falha ao reservar acesso: {exc}")
+                return None
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         
