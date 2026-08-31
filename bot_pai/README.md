@@ -60,6 +60,9 @@ Durante o teste, o bot filho roda em `bot_pai/runtime/trial-ID/` e usa:
 - ID admin informado pelo cliente;
 - estoque central configurado por `central_stock_api_url` e `central_stock_api_key`;
 - desligamento automatico quando o prazo expira.
+- restauracao automatica apos reiniciar o bot pai, se ainda houver tempo de teste.
+
+Os testes ativos ficam registrados em `data/trials.json`.
 
 Essa primeira etapa apenas cadastra e organiza os bots filhos. A proxima etapa e ligar esse cadastro ao motor multi-cliente ou ao provisionamento automatico.
 

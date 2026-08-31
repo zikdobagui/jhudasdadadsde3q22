@@ -8,6 +8,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BOTS_FILE = os.path.join(DATA_DIR, "bots.json")
 REQUESTS_FILE = os.path.join(DATA_DIR, "requests.json")
+TRIALS_FILE = os.path.join(DATA_DIR, "trials.json")
 
 
 def ensure_storage():
@@ -16,6 +17,8 @@ def ensure_storage():
         save_bots([])
     if not os.path.isfile(REQUESTS_FILE):
         save_requests([])
+    if not os.path.isfile(TRIALS_FILE):
+        save_trials([])
 
 
 def load_bots():
@@ -87,6 +90,63 @@ def update_request_status(request_id, status):
             item["updated_at"] = now
             save_requests(requests)
             return item
+    return None
+
+
+def load_trials():
+    ensure_storage()
+    with open(TRIALS_FILE, "r", encoding="utf-8-sig") as file:
+        return json.load(file)
+
+
+def save_trials(trials):
+    os.makedirs(DATA_DIR, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix="trials-", suffix=".json", dir=DATA_DIR)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(trials, file, ensure_ascii=False, indent=2)
+        os.replace(temp_path, TRIALS_FILE)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def upsert_trial(trial):
+    trials = load_trials()
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    trial = dict(trial)
+    trial["updated_at"] = now
+    for index, item in enumerate(trials):
+        if int(item["id"]) == int(trial["id"]):
+            trials[index] = {**item, **trial}
+            save_trials(trials)
+            return trials[index]
+    trials.append(trial)
+    save_trials(trials)
+    return trial
+
+
+def update_trial_status(trial_id, status):
+    trials = load_trials()
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    for item in trials:
+        if int(item["id"]) == int(trial_id):
+            item["status"] = status
+            item["updated_at"] = now
+            save_trials(trials)
+            return item
+    return None
+
+
+def update_child_bot(bot_id, **changes):
+    bots = load_bots()
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    for child in bots:
+        if int(child["id"]) == int(bot_id):
+            child.update(changes)
+            child["updated_at"] = now
+            save_bots(bots)
+            return child
     return None
 
 

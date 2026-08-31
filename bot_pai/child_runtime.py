@@ -14,6 +14,20 @@ RUNTIME_DIR = os.path.join(BASE_DIR, "runtime")
 active_trials = {}
 
 
+def parse_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value))
+
+
+def serialize_trial(trial):
+    data = dict(trial)
+    for key in ("created_at", "expires_at"):
+        if isinstance(data.get(key), datetime):
+            data[key] = data[key].isoformat()
+    return data
+
+
 def _ignore_runtime_files(directory, names):
     ignored = {
         ".git",
@@ -58,6 +72,8 @@ def _prepare_child_credentials(runtime_path, trial):
 
 
 def start_trial_bot(trial, on_expire=None):
+    trial = dict(trial)
+    trial["expires_at"] = parse_datetime(trial["expires_at"])
     os.makedirs(RUNTIME_DIR, exist_ok=True)
     runtime_path = os.path.join(RUNTIME_DIR, f"trial-{trial['id']}")
     if os.path.exists(runtime_path):
@@ -73,7 +89,8 @@ def start_trial_bot(trial, on_expire=None):
         stderr=subprocess.DEVNULL,
     )
 
-    trial_seconds = max(int(trial["trial_minutes"]) * 60, 60)
+    remaining = (trial["expires_at"] - datetime.now()).total_seconds()
+    trial_seconds = max(int(remaining), 1)
     timer = threading.Timer(trial_seconds, stop_trial_bot, args=(trial["id"], "expired", on_expire))
     timer.daemon = True
     timer.start()
@@ -122,6 +139,7 @@ def build_trial(data, config, request_id):
         "admin_id": int(data["admin_id"]),
         "username": data.get("username", ""),
         "trial_minutes": minutes,
+        "status": "trial_running",
         "created_at": now,
         "expires_at": now + timedelta(minutes=minutes),
         "central_stock_api_url": config.get("central_stock_api_url") or "https://vendasdoramon.squareweb.app",

@@ -1,20 +1,25 @@
 import json
 import os
 import threading
+from datetime import datetime
 from textwrap import dedent
 
 import telebot
 from telebot import types
 
-from child_runtime import build_trial, start_trial_bot, stop_trial_bot
+from child_runtime import build_trial, parse_datetime, serialize_trial, start_trial_bot, stop_trial_bot
 from storage import (
     create_child_bot,
     create_customer_request,
     find_bot,
     load_bots,
     load_requests,
+    load_trials,
+    update_child_bot,
     update_request_status,
+    update_trial_status,
     update_status,
+    upsert_trial,
 )
 from stock_api import run_stock_api
 from stock_storage import stock_summary
@@ -24,6 +29,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 pending_new_bots = {}
 pending_trials = {}
+pending_bot_edits = {}
 
 
 def load_config():
@@ -107,9 +113,25 @@ def bot_actions_markup(child):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton(status_action, callback_data=status_callback),
-        types.InlineKeyboardButton("Bots", callback_data="menu:bots"),
+        types.InlineKeyboardButton("Editar", callback_data=f"bot:edit:{child['id']}"),
     )
+    markup.add(types.InlineKeyboardButton("Bots", callback_data="menu:bots"))
     markup.add(types.InlineKeyboardButton("Menu", callback_data="menu:home"))
+    return markup
+
+
+def bot_edit_markup(child_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("Nome", callback_data=f"botedit:name:{child_id}"),
+        types.InlineKeyboardButton("Dono", callback_data=f"botedit:owner:{child_id}"),
+    )
+    markup.add(
+        types.InlineKeyboardButton("Token", callback_data=f"botedit:token:{child_id}"),
+        types.InlineKeyboardButton("Usuario", callback_data=f"botedit:username:{child_id}"),
+    )
+    markup.add(types.InlineKeyboardButton("Vencimento", callback_data=f"botedit:expires:{child_id}"))
+    markup.add(types.InlineKeyboardButton("Voltar", callback_data=f"bot:view:{child_id}"))
     return markup
 
 
@@ -287,7 +309,7 @@ def trial_callback(call):
     bot.answer_callback_query(call.id)
 
     if action == "stop":
-        stopped = stop_trial_bot(int(trial_id), "manual")
+        stopped = stop_trial_bot(int(trial_id), "manual", on_expire=notify_trial_expired)
         text = "Teste desligado." if stopped else "Teste nao estava ativo."
         bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
 
@@ -330,6 +352,7 @@ def collect_trial_admin_id(message):
     update_request_status(request["id"], "trial_running")
 
     try:
+        upsert_trial(serialize_trial(trial))
         start_trial_bot(trial, on_expire=notify_trial_expired)
     except Exception as exc:
         update_request_status(request["id"], "failed")
@@ -376,8 +399,10 @@ def notify_admins_trial_started(trial, request):
 
 
 def notify_trial_expired(trial_id, reason, runtime):
-    update_request_status(trial_id, "trial_expired")
-    text = f"Teste #{trial_id} expirou e foi desligado automaticamente."
+    status = "trial_expired" if reason == "expired" else "stopped"
+    update_request_status(trial_id, status)
+    update_trial_status(trial_id, status)
+    text = f"Teste #{trial_id} expirou e foi desligado automaticamente." if reason == "expired" else f"Teste #{trial_id} foi desligado."
     for admin_id in admin_ids:
         try:
             bot.send_message(admin_id, text)
@@ -521,6 +546,16 @@ def bot_callback(call):
         child = update_status(bot_id, "suspended")
     elif action == "activate":
         child = update_status(bot_id, "active")
+    elif action == "edit":
+        child = find_bot(bot_id)
+        if child:
+            bot.edit_message_text(
+                f"<b>Editar {child['name']}</b>\n\nEscolha o campo que deseja alterar.",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=bot_edit_markup(child["id"]),
+            )
+            return
     else:
         child = None
 
@@ -553,6 +588,59 @@ def show_child_detail(chat_id, message_id, child):
         """
     ).strip()
     bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=bot_actions_markup(child))
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("botedit:"))
+def bot_edit_callback(call):
+    if not is_admin_obj(call):
+        deny(call)
+        return
+    _, field, child_id = call.data.split(":", 2)
+    child = find_bot(child_id)
+    if not child:
+        bot.answer_callback_query(call.id, "Bot nao encontrado.", show_alert=True)
+        return
+    labels = {
+        "name": "novo nome",
+        "owner": "novo ID do dono",
+        "token": "novo token",
+        "username": "novo usuario",
+        "expires": "novo vencimento",
+    }
+    bot.answer_callback_query(call.id)
+    pending_bot_edits[call.from_user.id] = {"bot_id": int(child_id), "field": field}
+    msg = bot.send_message(call.message.chat.id, f"Envie o {labels.get(field, 'novo valor')}.")
+    bot.register_next_step_handler(msg, collect_bot_edit)
+
+
+def collect_bot_edit(message):
+    state = pending_bot_edits.pop(message.from_user.id, None)
+    if not state:
+        return
+    value = (message.text or "").strip()
+    field_map = {
+        "name": "name",
+        "owner": "owner_id",
+        "token": "token",
+        "username": "username",
+        "expires": "expires_at",
+    }
+    field = field_map.get(state["field"])
+    if not field:
+        bot.send_message(message.chat.id, "Campo invalido.", reply_markup=main_menu_markup())
+        return
+    if field == "owner_id":
+        try:
+            value = int(value)
+        except ValueError:
+            bot.send_message(message.chat.id, "ID invalido. Envie apenas numeros.")
+            return
+    child = update_child_bot(state["bot_id"], **{field: value})
+    if not child:
+        bot.send_message(message.chat.id, "Bot nao encontrado.", reply_markup=main_menu_markup())
+        return
+    bot.send_message(message.chat.id, "Bot atualizado.")
+    show_home(message.chat.id)
 
 
 def collect_child_name(message):
@@ -653,4 +741,20 @@ if __name__ == "__main__":
         args=("0.0.0.0", api_port, api_key),
         daemon=True,
     ).start()
+    restored = 0
+    now = datetime.now()
+    for saved_trial in load_trials():
+        if saved_trial.get("status") != "trial_running":
+            continue
+        try:
+            if parse_datetime(saved_trial["expires_at"]) <= now:
+                update_trial_status(saved_trial["id"], "trial_expired")
+                update_request_status(saved_trial["id"], "trial_expired")
+                continue
+            start_trial_bot(saved_trial, on_expire=notify_trial_expired)
+            restored += 1
+        except Exception as exc:
+            update_trial_status(saved_trial.get("id", 0), "failed")
+            print(f"[TRIAL] Falha ao restaurar teste {saved_trial.get('id')}: {exc}")
+    print(f"[TRIAL] Testes restaurados: {restored}")
     bot.infinity_polling(skip_pending=True)
