@@ -1125,6 +1125,29 @@ print("Codigo iniciado...")
 sdk = mercadopago.SDK(api.CredentialsChange.InfoPix.token_mp())
 bot = telebot.TeleBot(api.CredentialsChange.token_bot())
 
+
+def usa_estoque_central():
+    try:
+        return api.ControleLogins.usando_estoque_central()
+    except Exception:
+        return False
+
+
+def bloquear_estoque_central(message_or_call):
+    texto = (
+        "Estoque bloqueado neste bot.\n\n"
+        "Este bot usa estoque central via API e o admin do bot filho nao pode "
+        "ver, adicionar, remover ou alterar acessos."
+    )
+    if hasattr(message_or_call, "message"):
+        try:
+            bot.answer_callback_query(message_or_call.id, "Estoque bloqueado neste bot.", show_alert=True)
+        except Exception:
+            pass
+        bot.send_message(message_or_call.message.chat.id, texto)
+    else:
+        bot.reply_to(message_or_call, texto)
+
 _original_bot_send_message = bot.send_message
 _original_bot_send_photo = bot.send_photo
 _original_bot_send_video = bot.send_video
@@ -1730,8 +1753,11 @@ def painel_admin(message):
 
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton(f'{gear} Configuracoes Gerais', callback_data='configuracoes_geral'))
-        markup.row(InlineKeyboardButton(f'{lock} Configurar Logins', callback_data='configurar_logins'),
-                   InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
+        if usa_estoque_central():
+            markup.row(InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
+        else:
+            markup.row(InlineKeyboardButton(f'{lock} Configurar Logins', callback_data='configurar_logins'),
+                       InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
         markup.row(InlineKeyboardButton(f'{handshake} Configurar Afiliados', callback_data='configurar_afiliados'),
                    InlineKeyboardButton('👑 Clube VIP', callback_data='admin_vip'))
         markup.row(InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
@@ -4204,6 +4230,9 @@ def adicionar_logins_duplicados_confirmados(user_id):
 
 @bot.message_handler(func=lambda message: '/addlogin' in message.text.split('===')[0])
 def adicionar_login(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
     
     if not (api.Admin.verificar_admin(message.chat.id) or int(message.chat.id) == int(api.CredentialsChange.id_dono())):
         bot.reply_to(message, "â€¢ VocÃª nÃ£o tem permissÃ£o para usar este comando!")
@@ -4317,6 +4346,10 @@ def adicionar_login(message):
 
 @bot.message_handler(func=lambda message: adding_logins.get(message.from_user.id, False) and not message.text.startswith('/'))
 def receber_logins(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     user_id = message.from_user.id
     if not adding_logins.get(user_id, False):
         return
@@ -4367,6 +4400,10 @@ def receber_logins(message):
     add_login_timers[user_id] = timer
 
 def remover_login(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     separador = api.CredentialsChange.separador()
     try:
         stri = message.text.strip().split(f'{separador}')
@@ -4383,6 +4420,10 @@ def remover_login(message):
         bot.reply_to(message, "Erro ao remover o login.")
 
 def remover_por_plataforma(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     plat = message.text
     try:
         api.ControleLogins.remover_por_nome(plat)
@@ -4398,6 +4439,10 @@ def remover_por_plataforma(message):
         bot.reply_to(message, 'Erro ao remover os logins...')
 
 def mudar_valor_servico(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     try:
         sep = api.CredentialsChange.separador()
         txt = message.text.strip().split(f'{sep}')
@@ -4411,6 +4456,10 @@ def mudar_valor_servico(message):
         bot.reply_to(message, 'Falha ao mudar o valor. Use, por exemplo: NETFLIX/12.99')
 
 def mudar_valor_todos(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     try:
         valor = parse_valor_monetario(message.text)
         api.ControleLogins.mudar_valor_de_todos(valor)
@@ -4425,6 +4474,10 @@ def _mascarar_senha_estoque(senha):
     return senha[:1] + ('*' * max(len(senha) - 2, 1)) + senha[-1:]
 
 def pesquisar_estoque_admin(message):
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     termo = message.text.strip()
     if not termo:
         bot.reply_to(message, "Envie um nome, email ou palavra da descriÃ§Ã£o para pesquisar.")
@@ -4556,6 +4609,10 @@ def configurar_logins(message):
     """
     Exibe o menu de configuraÃ§Ã£o de logins com uma interface melhorada.
     """
+    if usa_estoque_central():
+        bloquear_estoque_central(message)
+        return
+
     separador = api.CredentialsChange.separador()
     texto = (
         f'â€¢ <b>Logins em Estoque:</b> {api.ControleLogins.estoque_total()}\n\n'
@@ -4602,6 +4659,10 @@ def confirmar_zerar_estoque(call):
     """
     ConfirmaÃ§Ã£o antes de zerar o estoque.
     """
+    if usa_estoque_central():
+        bloquear_estoque_central(call)
+        return
+
     texto = 'âœ… Tem certeza que deseja zerar todo o estoque? Essa aÃ§Ã£o nÃ£o pode ser desfeita.'
     
     markup = InlineKeyboardMarkup()
@@ -4621,6 +4682,10 @@ def zerar_estoque(call):
     """
     Zera completamente o estoque de logins.
     """
+    if usa_estoque_central():
+        bloquear_estoque_central(call)
+        return
+
     api.ControleLogins.zerar_estoque()  # Chamando a função para zerar o estoque
     
     # Atualizar catálogo do miniapp após zerar estoque
@@ -9794,6 +9859,20 @@ def callback_query(call):
         bot.register_next_step_handler(call.message, mudar_separador, call.id)
 
     # =============== ConfiguraÃ§Ãµes de login
+    estoque_admin_callbacks = {
+        'configurar_logins',
+        'adicionar_login',
+        'pesquisar_estoque_admin',
+        'remover_login',
+        'remover_por_plataforma',
+        'zerar_estoque',
+        'mudar_valor_servico',
+        'mudar_valor_todos',
+    }
+    if call.data in estoque_admin_callbacks and usa_estoque_central():
+        bloquear_estoque_central(call)
+        return
+
     if call.data == 'configurar_logins':
         configurar_logins(call.message)
     if call.data == 'adicionar_login':

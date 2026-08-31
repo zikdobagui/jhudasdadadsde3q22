@@ -1506,6 +1506,9 @@ class ControleLogins():
                     break
         return resultados
     def criar_estoque_detalhado():
+        if ControleLogins.usando_estoque_central():
+            return False
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         mensagem = "ACESSOS EM ESTOQUE:\n"
@@ -1515,6 +1518,9 @@ class ControleLogins():
             f.write(mensagem)
         return True
     def arquivo_estoque_detalhado():
+        if ControleLogins.usando_estoque_central():
+            return None
+
         with open_utf8('historicos/estoque_detalhado.txt', 'rb') as file:
             return file
     def remover_por_nome(nome):
@@ -1589,6 +1595,9 @@ class ControleLogins():
         # Se não encontrou o produto, retorna valores padrão
         return nome, "0.00", "Produto não encontrado", "30", "nao@encontrado.com"
     def entregar_acesso(nome, email):
+        if ControleLogins.usando_estoque_central():
+            return None
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
@@ -1600,6 +1609,9 @@ class ControleLogins():
             else:
                 pass
     def pegar_info_entrega(nome, email):
+        if ControleLogins.usando_estoque_central():
+            return None
+
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
         for acesso in data["acessos"]:
