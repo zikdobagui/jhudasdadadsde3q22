@@ -20,7 +20,7 @@ def ensure_stock():
 
 def load_stock():
     ensure_stock()
-    with open(STOCK_FILE, "r", encoding="utf-8") as file:
+    with open(STOCK_FILE, "r", encoding="utf-8-sig") as file:
         data = json.load(file)
     if isinstance(data, list):
         return {"acessos": data}

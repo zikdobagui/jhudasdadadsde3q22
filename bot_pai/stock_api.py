@@ -88,6 +88,14 @@ class StockAPI:
 
 
 def run_stock_api(host, port, api_key):
-    server = ThreadingHTTPServer((host, int(port)), StockAPI(api_key).handler())
+    try:
+        server = ThreadingHTTPServer((host, int(port)), StockAPI(api_key).handler())
+    except PermissionError:
+        if int(port) != 80:
+            raise
+        fallback_port = 8080
+        print(f"[STOCK API] Sem permissao para porta 80. Usando porta local {fallback_port}.")
+        server = ThreadingHTTPServer((host, fallback_port), StockAPI(api_key).handler())
+        port = fallback_port
     print(f"[STOCK API] Rodando em {host}:{port}")
     server.serve_forever()

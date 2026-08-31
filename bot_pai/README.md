@@ -30,17 +30,36 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## Comandos
+## Painel
 
-```text
-/start
-/novo_bot Nome da Loja | ID_DONO | TOKEN | @usuario | 30/09/2026
-/bots
-/bot ID
-/suspender ID
-/ativar ID
-/estoque
-```
+Use `/start` para abrir a area do cliente.
+
+Clientes veem:
+
+- Testar bot: pede nome da loja, token do bot e ID do admin; liga um bot filho temporario automaticamente.
+- Alugar bot.
+- Falar com suporte.
+
+Admins tambem veem o botao `Painel admin`, com acesso a dados sensiveis.
+
+O cadastro de bot filho e guiado pelo bot:
+
+1. Nome da loja.
+2. ID Telegram do dono.
+3. Token do bot filho.
+4. Usuario do bot filho.
+5. Vencimento.
+
+## Teste automatico
+
+O tempo do teste vem de `trial_minutes` no `config.json`.
+
+Durante o teste, o bot filho roda em `bot_pai/runtime/trial-ID/` e usa:
+
+- token informado pelo cliente;
+- ID admin informado pelo cliente;
+- estoque central configurado por `central_stock_api_url` e `central_stock_api_key`;
+- desligamento automatico quando o prazo expira.
 
 Essa primeira etapa apenas cadastra e organiza os bots filhos. A proxima etapa e ligar esse cadastro ao motor multi-cliente ou ao provisionamento automatico.
 

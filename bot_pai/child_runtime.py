@@ -1,0 +1,127 @@
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+from datetime import datetime, timedelta
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(BASE_DIR)
+RUNTIME_DIR = os.path.join(BASE_DIR, "runtime")
+
+active_trials = {}
+
+
+def _ignore_runtime_files(directory, names):
+    ignored = {
+        ".git",
+        "__pycache__",
+        "bot_pai",
+        "sync_log.txt",
+        "sync_log.txt.1",
+        "sync_log.txt.2",
+        "sync_log.txt.3",
+        "casino.log",
+    }
+    return {name for name in names if name in ignored or name.endswith(".zip")}
+
+
+def _load_json(path):
+    with open(path, "r", encoding="utf-8-sig") as file:
+        return json.load(file)
+
+
+def _save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def _prepare_child_credentials(runtime_path, trial):
+    source = os.path.join(PROJECT_DIR, "settings", "credenciais.example.json")
+    credentials = _load_json(source)
+    credentials["id_dono"] = int(trial["admin_id"])
+    credentials["api-bot"] = trial["token"]
+    credentials["user_bot"] = trial.get("username", "")
+    credentials["link_suporte"] = trial.get("support_url", "")
+    credentials["central_stock_api_url"] = trial["central_stock_api_url"]
+    credentials["central_stock_api_key"] = trial["central_stock_api_key"]
+    credentials["child_bot_id"] = f"trial-{trial['id']}"
+    credentials["vencimento_bot"] = trial["expires_at"].strftime("%d/%m/%Y")
+    credentials["maintance"] = "off"
+    _save_json(os.path.join(runtime_path, "settings", "credenciais.json"), credentials)
+
+
+def start_trial_bot(trial, on_expire=None):
+    os.makedirs(RUNTIME_DIR, exist_ok=True)
+    runtime_path = os.path.join(RUNTIME_DIR, f"trial-{trial['id']}")
+    if os.path.exists(runtime_path):
+        shutil.rmtree(runtime_path)
+
+    shutil.copytree(PROJECT_DIR, runtime_path, ignore=_ignore_runtime_files)
+    _prepare_child_credentials(runtime_path, trial)
+
+    process = subprocess.Popen(
+        [sys.executable, "bot.py"],
+        cwd=runtime_path,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    trial_seconds = max(int(trial["trial_minutes"]) * 60, 60)
+    timer = threading.Timer(trial_seconds, stop_trial_bot, args=(trial["id"], "expired", on_expire))
+    timer.daemon = True
+    timer.start()
+
+    active_trials[trial["id"]] = {
+        "process": process,
+        "timer": timer,
+        "runtime_path": runtime_path,
+        "expires_at": trial["expires_at"],
+    }
+    return active_trials[trial["id"]]
+
+
+def stop_trial_bot(trial_id, reason="stopped", on_expire=None):
+    runtime = active_trials.pop(trial_id, None)
+    if not runtime:
+        return False
+
+    timer = runtime.get("timer")
+    if timer:
+        timer.cancel()
+
+    process = runtime.get("process")
+    if process and process.poll() is None:
+        try:
+            process.terminate()
+            process.wait(timeout=10)
+        except Exception:
+            try:
+                process.kill()
+            except Exception:
+                pass
+
+    if on_expire:
+        on_expire(trial_id, reason, runtime)
+    return True
+
+
+def build_trial(data, config, request_id):
+    minutes = int(config.get("trial_minutes", 10))
+    now = datetime.now()
+    return {
+        "id": request_id,
+        "store_name": data["store_name"],
+        "token": data["token"],
+        "admin_id": int(data["admin_id"]),
+        "username": data.get("username", ""),
+        "trial_minutes": minutes,
+        "created_at": now,
+        "expires_at": now + timedelta(minutes=minutes),
+        "central_stock_api_url": config.get("central_stock_api_url") or "https://vendasdoramon.squareweb.app",
+        "central_stock_api_key": config.get("central_stock_api_key") or config.get("stock_api_key", ""),
+        "support_url": config.get("support_url", ""),
+    }
