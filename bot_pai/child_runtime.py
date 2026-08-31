@@ -49,7 +49,9 @@ def _prepare_child_credentials(runtime_path, trial):
     credentials["central_stock_api_url"] = trial["central_stock_api_url"]
     credentials["central_stock_api_key"] = trial["central_stock_api_key"]
     credentials["child_bot_id"] = f"trial-{trial['id']}"
-    credentials["vencimento_bot"] = trial["expires_at"].strftime("%d/%m/%Y")
+    # O prazo real do teste e controlado pelo timer do bot pai.
+    # O vencimento interno do bot filho fica distante para nao bloquear o teste.
+    credentials["vencimento_bot"] = "01/01/2099"
     credentials["maintance"] = "off"
     _save_json(os.path.join(runtime_path, "settings", "credenciais.json"), credentials)
 
