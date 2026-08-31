@@ -146,6 +146,14 @@ def start_trial_bot(trial, on_expire=None, rebuild_runtime=True):
     return active_trials[trial["id"]]
 
 
+def is_trial_running(trial_id):
+    runtime = active_trials.get(int(trial_id))
+    if not runtime:
+        return False
+    process = runtime.get("process")
+    return bool(process and process.poll() is None)
+
+
 def stop_trial_bot(trial_id, reason="stopped", on_expire=None):
     runtime = active_trials.pop(trial_id, None)
     if not runtime:
@@ -170,6 +178,14 @@ def stop_trial_bot(trial_id, reason="stopped", on_expire=None):
     if on_expire:
         on_expire(trial_id, reason, runtime)
     return True
+
+
+def delete_trial_runtime(trial_id):
+    stop_trial_bot(int(trial_id), "deleted", None)
+    runtime_path = os.path.join(RUNTIME_DIR, f"trial-{trial_id}")
+    _terminate_pid(_read_pid(runtime_path))
+    if os.path.exists(runtime_path):
+        shutil.rmtree(runtime_path, ignore_errors=True)
 
 
 def build_trial(data, config, request_id):

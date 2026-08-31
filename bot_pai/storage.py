@@ -138,6 +138,23 @@ def update_trial_status(trial_id, status):
     return None
 
 
+def find_trial(trial_id):
+    trial_id = int(trial_id)
+    for trial in load_trials():
+        if int(trial["id"]) == trial_id:
+            return trial
+    return None
+
+
+def delete_trial(trial_id):
+    trials = load_trials()
+    remaining = [trial for trial in trials if int(trial["id"]) != int(trial_id)]
+    if len(remaining) == len(trials):
+        return False
+    save_trials(remaining)
+    return True
+
+
 def update_child_bot(bot_id, **changes):
     bots = load_bots()
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -148,6 +165,15 @@ def update_child_bot(bot_id, **changes):
             save_bots(bots)
             return child
     return None
+
+
+def delete_child_bot(bot_id):
+    bots = load_bots()
+    remaining = [child for child in bots if int(child["id"]) != int(bot_id)]
+    if len(remaining) == len(bots):
+        return False
+    save_bots(remaining)
+    return True
 
 
 def next_bot_id(bots):

@@ -7,11 +7,22 @@ from textwrap import dedent
 import telebot
 from telebot import types
 
-from child_runtime import build_trial, parse_datetime, serialize_trial, start_trial_bot, stop_trial_bot
+from child_runtime import (
+    build_trial,
+    delete_trial_runtime,
+    is_trial_running,
+    parse_datetime,
+    serialize_trial,
+    start_trial_bot,
+    stop_trial_bot,
+)
 from storage import (
     create_child_bot,
     create_customer_request,
+    delete_child_bot,
+    delete_trial,
     find_bot,
+    find_trial,
     load_bots,
     load_requests,
     load_trials,
@@ -115,8 +126,34 @@ def bot_actions_markup(child):
         types.InlineKeyboardButton(status_action, callback_data=status_callback),
         types.InlineKeyboardButton("Editar", callback_data=f"bot:edit:{child['id']}"),
     )
+    markup.add(types.InlineKeyboardButton("Excluir", callback_data=f"bot:confirm_delete:{child['id']}"))
     markup.add(types.InlineKeyboardButton("Bots", callback_data="menu:bots"))
     markup.add(types.InlineKeyboardButton("Menu", callback_data="menu:home"))
+    return markup
+
+
+def trial_admin_markup(trial):
+    trial_id = int(trial["id"])
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if is_trial_running(trial_id):
+        markup.add(types.InlineKeyboardButton("Desligar", callback_data=f"trial:stop:{trial_id}"))
+    elif parse_datetime(trial["expires_at"]) > datetime.now():
+        markup.add(types.InlineKeyboardButton("Ligar", callback_data=f"trial:start:{trial_id}"))
+    markup.add(
+        types.InlineKeyboardButton("Excluir", callback_data=f"trial:confirm_delete:{trial_id}"),
+        types.InlineKeyboardButton("Atualizar", callback_data=f"trial:view:{trial_id}"),
+    )
+    markup.add(types.InlineKeyboardButton("Bots", callback_data="menu:bots"))
+    markup.add(types.InlineKeyboardButton("Menu", callback_data="menu:home"))
+    return markup
+
+
+def confirm_delete_markup(kind, item_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("Sim, excluir", callback_data=f"{kind}:delete:{item_id}"),
+        types.InlineKeyboardButton("Cancelar", callback_data=f"{kind}:view:{item_id}"),
+    )
     return markup
 
 
@@ -230,6 +267,11 @@ def menu_callback(call):
         return
 
 
+@bot.callback_query_handler(func=lambda call: call.data == "noop")
+def noop_callback(call):
+    bot.answer_callback_query(call.id)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith("client:"))
 def client_callback(call):
     action = call.data.split(":", 1)[1]
@@ -307,11 +349,58 @@ def trial_callback(call):
 
     _, action, trial_id = call.data.split(":", 2)
     bot.answer_callback_query(call.id)
+    trial_id_int = int(trial_id)
+
+    if action == "view":
+        trial = find_trial(trial_id_int)
+        if not trial:
+            bot.edit_message_text("Teste nao encontrado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+            return
+        show_trial_detail(call.message.chat.id, call.message.message_id, trial)
+        return
+
+    if action == "start":
+        trial = find_trial(trial_id_int)
+        if not trial:
+            bot.edit_message_text("Teste nao encontrado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+            return
+        if parse_datetime(trial["expires_at"]) <= datetime.now():
+            update_trial_status(trial_id_int, "trial_expired")
+            update_request_status(trial_id_int, "trial_expired")
+            bot.edit_message_text("Teste ja expirou.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
+            return
+        update_trial_status(trial_id_int, "trial_running")
+        trial["status"] = "trial_running"
+        start_trial_bot(trial, on_expire=notify_trial_expired, rebuild_runtime=False)
+        show_trial_detail(call.message.chat.id, call.message.message_id, find_trial(trial_id_int) or trial)
+        return
 
     if action == "stop":
-        stopped = stop_trial_bot(int(trial_id), "manual", on_expire=notify_trial_expired)
-        text = "Teste desligado." if stopped else "Teste nao estava ativo."
-        bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
+        stopped = stop_trial_bot(trial_id_int, "manual", on_expire=notify_trial_expired)
+        if not stopped:
+            update_trial_status(trial_id_int, "stopped")
+            update_request_status(trial_id_int, "stopped")
+        trial = find_trial(trial_id_int)
+        if trial:
+            show_trial_detail(call.message.chat.id, call.message.message_id, trial)
+        else:
+            bot.edit_message_text("Teste desligado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
+        return
+
+    if action == "confirm_delete":
+        bot.edit_message_text(
+            f"Tem certeza que deseja excluir o teste #{trial_id_int} e limpar a pasta runtime dele?",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=confirm_delete_markup("trial", trial_id_int),
+        )
+        return
+
+    if action == "delete":
+        delete_trial_runtime(trial_id_int)
+        delete_trial(trial_id_int)
+        update_request_status(trial_id_int, "deleted")
+        bot.edit_message_text("Teste excluido.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
 
 
 def collect_trial_store_name(message):
@@ -493,18 +582,36 @@ def show_request_detail(chat_id, message_id, request):
 
 def show_bots(chat_id, message_id=None):
     children = load_bots()
-    if not children:
-        text = "<b>Bots filhos</b>\n\nNenhum bot cadastrado ainda."
+    trials = load_trials()
+    if not children and not trials:
+        text = "<b>Bots filhos</b>\n\nNenhum bot cadastrado ou teste criado ainda."
         markup = back_markup()
     else:
-        text = "<b>Bots filhos</b>\n\nEscolha um bot para ver detalhes."
+        text = "<b>Bots filhos</b>\n\nEscolha um item para ver detalhes e controlar."
         markup = types.InlineKeyboardMarkup()
+        if children:
+            markup.add(types.InlineKeyboardButton("Bots cadastrados", callback_data="noop"))
         for child in children[:40]:
             status = "OK" if child.get("status") == "active" else "PAUSADO"
             markup.add(
                 types.InlineKeyboardButton(
                     f"{status} #{child['id']} {child['name']}",
                     callback_data=f"bot:view:{child['id']}",
+                )
+            )
+        if trials:
+            markup.add(types.InlineKeyboardButton("Testes / temporarios", callback_data="noop"))
+        for trial in trials[:40]:
+            if is_trial_running(trial["id"]):
+                status = "LIGADO"
+            elif trial.get("status") == "trial_expired":
+                status = "EXPIRADO"
+            else:
+                status = str(trial.get("status", "parado")).upper()
+            markup.add(
+                types.InlineKeyboardButton(
+                    f"{status} #{trial['id']} {trial.get('store_name', 'sem nome')}",
+                    callback_data=f"trial:view:{trial['id']}",
                 )
             )
         markup.add(types.InlineKeyboardButton("Voltar", callback_data="menu:home"))
@@ -546,6 +653,29 @@ def bot_callback(call):
         child = update_status(bot_id, "suspended")
     elif action == "activate":
         child = update_status(bot_id, "active")
+    elif action == "confirm_delete":
+        child = find_bot(bot_id)
+        if not child:
+            bot.edit_message_text(
+                "Bot filho nao encontrado.",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=back_markup(),
+            )
+            return
+        bot.edit_message_text(
+            f"Tem certeza que deseja excluir o bot #{child['id']} {child['name']}?",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=confirm_delete_markup("bot", child["id"]),
+        )
+        return
+    elif action == "delete":
+        if delete_child_bot(bot_id):
+            bot.edit_message_text("Bot filho excluido.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=main_menu_markup())
+        else:
+            bot.edit_message_text("Bot filho nao encontrado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+        return
     elif action == "edit":
         child = find_bot(bot_id)
         if child:
@@ -588,6 +718,29 @@ def show_child_detail(chat_id, message_id, child):
         """
     ).strip()
     bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=bot_actions_markup(child))
+
+
+def show_trial_detail(chat_id, message_id, trial):
+    token_preview = trial["token"][:8] + "..." if trial.get("token") else "sem token"
+    running = "ligado" if is_trial_running(trial["id"]) else "desligado"
+    expires_at = parse_datetime(trial["expires_at"])
+    remaining = int(max((expires_at - datetime.now()).total_seconds(), 0) // 60)
+    text = dedent(
+        f"""
+        <b>Teste #{trial['id']} - {trial.get('store_name', 'sem nome')}</b>
+
+        Status salvo: <code>{trial.get('status')}</code>
+        Processo: <code>{running}</code>
+        Admin do filho: <code>{trial.get('admin_id')}</code>
+        Usuario: <code>{trial.get('username') or 'sem usuario'}</code>
+        Token: <code>{token_preview}</code>
+        API central: <code>{trial.get('central_stock_api_url') or 'sem api'}</code>
+        Criado em: <code>{trial.get('created_at')}</code>
+        Expira em: <code>{expires_at.strftime('%d/%m/%Y %H:%M:%S')}</code>
+        Minutos restantes: <code>{remaining}</code>
+        """
+    ).strip()
+    bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=trial_admin_markup(trial))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("botedit:"))
