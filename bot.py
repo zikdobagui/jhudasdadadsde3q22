@@ -335,6 +335,7 @@ pending_description_edit = {}
 pending_carrinho_qtd = {}
 pending_duplicate_logins = {}
 pending_vip_level_edit = {}
+pending_price_edit = {}
 # Estado para adicionar notificaÃ§Ã£o de reabastecimento
 pending_notif_reabast = {}
 # Compras aguardando aceite dos termos antes de descontar saldo/entregar
@@ -4662,8 +4663,30 @@ def configurar_precos_revenda(message):
     )
 
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton('💰 Alterar Servico', callback_data='mudar_valor_servico'))
+    servicos = []
+    vistos = set()
+    for acesso in api.ControleLogins.pegar_servicos():
+        nome = str(acesso.get('nome', '')).strip()
+        if not nome or nome.casefold() in vistos:
+            continue
+        vistos.add(nome.casefold())
+        try:
+            valor = float(acesso.get('valor', 0) or 0)
+        except (TypeError, ValueError):
+            valor = 0
+        servicos.append((nome, valor))
+
+    for nome, valor in servicos[:40]:
+        markup.row(InlineKeyboardButton(
+            f'{nome} - R${valor:.2f}',
+            callback_data=service_callback_data('preco_servico', nome)
+        ))
+
+    if not servicos:
+        texto += '\n\nNenhum servico disponivel agora para editar.'
+
     markup.row(InlineKeyboardButton('💰 Alterar Todos', callback_data='mudar_valor_todos'))
+    markup.row(InlineKeyboardButton('✏️ Digitar Nome Manualmente', callback_data='mudar_valor_servico'))
     markup.row(InlineKeyboardButton('✅ Voltar', callback_data='voltar_paineladm'))
 
     bot.edit_message_text(
@@ -4673,6 +4696,19 @@ def configurar_precos_revenda(message):
         reply_markup=markup,
         parse_mode='HTML'
     )
+
+def receber_preco_revenda_servico(message):
+    servico = pending_price_edit.pop(message.chat.id, None)
+    if not servico:
+        bot.reply_to(message, 'Nenhum servico aguardando alteracao de preco.')
+        return
+
+    try:
+        valor = parse_valor_monetario(message.text)
+        api.ControleLogins.mudar_valor_por_nome(servico, valor)
+        bot.reply_to(message, f"O servico {servico} agora sera vendido por R${valor:.2f}")
+    except ValueError:
+        bot.reply_to(message, 'Valor invalido. Use, por exemplo: 12.99 ou 12,99.')
 
 @bot.callback_query_handler(func=lambda call: call.data == 'confirmar_zerar_estoque')
 def confirmar_zerar_estoque(call):
@@ -9893,6 +9929,18 @@ def callback_query(call):
 
     if call.data == 'precos_revenda':
         configurar_precos_revenda(call.message)
+    if call.data.startswith('preco_servico|'):
+        servico = resolve_service_callback_token(call.data.split('|', 1)[1])
+        if not servico:
+            bot.answer_callback_query(call.id, 'Servico nao encontrado.', show_alert=True)
+            return
+        pending_price_edit[call.message.chat.id] = servico
+        bot.send_message(
+            call.message.chat.id,
+            f"Digite o novo preco de venda para {servico}. Exemplo: 12.99",
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(call.message, receber_preco_revenda_servico)
     if call.data == 'configurar_logins':
         configurar_logins(call.message)
     if call.data == 'adicionar_login':
