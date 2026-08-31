@@ -1130,12 +1130,14 @@ class ControleLogins():
         url = str(data.get('central_stock_api_url', '')).strip().rstrip('/')
         key = str(data.get('central_stock_api_key', '')).strip()
         child_bot_id = str(data.get('child_bot_id', data.get('user_bot', ''))).strip()
+        reseller_admin_id = str(data.get('reseller_admin_id', data.get('id_dono', ''))).strip()
         if not url or not key:
             return None
         return {
             'url': url,
             'key': key,
-            'child_bot_id': child_bot_id
+            'child_bot_id': child_bot_id,
+            'reseller_admin_id': reseller_admin_id
         }
 
     @classmethod
@@ -1169,7 +1171,8 @@ class ControleLogins():
             return None
         payload = {
             'service': servico,
-            'child_bot_id': config['child_bot_id']
+            'child_bot_id': config['child_bot_id'],
+            'reseller_admin_id': config.get('reseller_admin_id', '')
         }
         response = requests.post(
             f"{config['url']}/api/stock/reserve",
@@ -1177,7 +1180,7 @@ class ControleLogins():
             headers=cls._remote_headers(config),
             timeout=cls._remote_timeout
         )
-        if response.status_code == 404:
+        if response.status_code in (402, 404):
             return None
         response.raise_for_status()
         return response.json().get('access')

@@ -16,6 +16,8 @@
   "central_stock_api_url": "",
   "central_stock_api_key": "",
   "child_bot_id": "",
+  "reseller_admin_id": "",
+  "reseller_billing_enabled": true,
   "token_mp": "COLOQUE_O_TOKEN_DO_MERCADO_PAGO",
   "separador": "/",
   "afiliados": "off",

@@ -21,6 +21,8 @@ import mimetypes
 import tempfile
 import threading
 
+import database
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 
@@ -29,6 +31,22 @@ ACESSOS_FILE = os.path.join(BASE_DIR, 'database', 'acessos.json')
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 CREDENTIALS_FILE = os.path.join(BASE_DIR, 'settings', 'credenciais.json')
 stock_lock = threading.Lock()
+
+
+def _reseller_billing_enabled():
+    return _load_credentials().get('reseller_billing_enabled', True) is not False
+
+
+def _load_user_for_billing(user_id):
+    user_data = database.load_user_data(user_id)
+    if user_data is None:
+        return None
+    user_data['saldo'] = float(user_data.get('saldo', 0) or 0)
+    return user_data
+
+
+def _save_user_for_billing(user_id, user_data):
+    database.save_user_data(user_id, user_data)
 
 
 def _load_credentials():
@@ -121,10 +139,10 @@ def gerar_catalogo():
     return catalogo
 
 
-def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id=''):
+def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id='', reseller_admin_id=''):
     servico_key = str(servico or '').strip().casefold()
     if not servico_key:
-        return None
+        return False, 'invalid_service', None
 
     with stock_lock:
         data = _load_acessos()
@@ -132,9 +150,33 @@ def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id=''):
 
         for index, acesso in enumerate(acessos):
             if str(acesso.get('nome', '')).strip().casefold() == servico_key:
+                valor = float(acesso.get('valor', 0) or 0)
+                reseller_admin_id = str(reseller_admin_id or '').strip()
+
+                if _reseller_billing_enabled():
+                    if not reseller_admin_id:
+                        return False, 'missing_reseller_admin_id', None
+                    reseller = _load_user_for_billing(reseller_admin_id)
+                    if reseller is None:
+                        return False, 'reseller_not_found', {'required_balance': valor}
+                    if float(reseller.get('saldo', 0) or 0) < valor:
+                        return False, 'insufficient_reseller_balance', {
+                            'required_balance': valor,
+                            'current_balance': float(reseller.get('saldo', 0) or 0)
+                        }
+                    reseller['saldo'] = round(float(reseller.get('saldo', 0) or 0) - valor, 2)
+                    reseller.setdefault('compras_fornecedor', []).append({
+                        'servico': acesso.get('nome', ''),
+                        'valor': valor,
+                        'child_bot_id': child_bot_id,
+                        'buyer_id': buyer_id,
+                        'sale_id': sale_id,
+                    })
+                    _save_user_for_billing(reseller_admin_id, reseller)
+
                 reservado = acessos.pop(index)
                 _save_acessos(data)
-                return {
+                return True, 'reserved', {
                     'nome': reservado.get('nome', ''),
                     'valor': reservado.get('valor', 0),
                     'email': reservado.get('email', ''),
@@ -145,9 +187,15 @@ def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id=''):
                         'child_bot_id': child_bot_id,
                         'buyer_id': buyer_id,
                         'sale_id': sale_id,
-                    }
+                        'reseller_admin_id': reseller_admin_id,
+                    },
+                    'billing': {
+                        'charged': _reseller_billing_enabled(),
+                        'reseller_admin_id': reseller_admin_id,
+                        'amount': valor,
+                    },
                 }
-    return None
+    return False, 'out_of_stock', None
 
 
 def adicionar_acesso(payload):
@@ -222,14 +270,16 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == '/api/stock/reserve':
-            acesso = reservar_primeiro_acesso(
+            ok, reason, acesso = reservar_primeiro_acesso(
                 payload.get('service'),
                 payload.get('child_bot_id', ''),
                 payload.get('buyer_id', ''),
                 payload.get('sale_id', ''),
+                payload.get('reseller_admin_id', ''),
             )
-            if not acesso:
-                self._responder_json(404, {'error': 'out_of_stock'})
+            if not ok:
+                status = 404 if reason == 'out_of_stock' else 402
+                self._responder_json(status, {'error': reason, 'details': acesso or {}})
                 return
             self._responder_json(200, {'access': acesso})
             return
