@@ -10762,8 +10762,21 @@ def iniciar_sync_acessos():
         print(f"Ã© Erro ao iniciar sincronizaÃ©o: {e}")
 
 
-# Iniciar sync em background para n?o bloquear o bot
-threading.Thread(target=iniciar_sync_acessos, daemon=True).start()
+try:
+    with open('settings/credenciais.json', 'r', encoding='utf-8-sig') as f:
+        _sync_credentials = json.load(f)
+    _uses_central_stock = bool(
+        str(_sync_credentials.get('central_stock_api_url', '')).strip()
+        and str(_sync_credentials.get('central_stock_api_key', '')).strip()
+    )
+except Exception:
+    _uses_central_stock = False
+
+# Bots filhos com estoque central nao precisam enviar acessos locais para sync antiga.
+if _uses_central_stock:
+    print("[ESTOQUE CENTRAL] Sync antiga de acessos desativada para bot filho.")
+else:
+    threading.Thread(target=iniciar_sync_acessos, daemon=True).start()
 
 print("? Bot iniciado e pronto para receber mensagens!")
 bot.infinity_polling()

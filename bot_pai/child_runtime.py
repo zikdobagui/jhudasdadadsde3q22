@@ -45,7 +45,8 @@ def _prepare_child_credentials(runtime_path, trial):
     credentials["id_dono"] = int(trial["admin_id"])
     credentials["api-bot"] = trial["token"]
     credentials["user_bot"] = trial.get("username", "")
-    credentials["link_suporte"] = trial.get("support_url", "")
+    support_url = trial.get("support_url") or "https://t.me/RamonSuporteV"
+    credentials["link_suporte"] = support_url
     credentials["central_stock_api_url"] = trial["central_stock_api_url"]
     credentials["central_stock_api_key"] = trial["central_stock_api_key"]
     credentials["child_bot_id"] = f"trial-{trial['id']}"
@@ -125,5 +126,5 @@ def build_trial(data, config, request_id):
         "expires_at": now + timedelta(minutes=minutes),
         "central_stock_api_url": config.get("central_stock_api_url") or "https://vendasdoramon.squareweb.app",
         "central_stock_api_key": config.get("central_stock_api_key") or config.get("stock_api_key", ""),
-        "support_url": config.get("support_url", ""),
+        "support_url": config.get("support_url") or "https://t.me/RamonSuporteV",
     }
