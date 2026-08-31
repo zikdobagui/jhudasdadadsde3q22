@@ -751,7 +751,7 @@ if __name__ == "__main__":
                 update_trial_status(saved_trial["id"], "trial_expired")
                 update_request_status(saved_trial["id"], "trial_expired")
                 continue
-            start_trial_bot(saved_trial, on_expire=notify_trial_expired)
+            start_trial_bot(saved_trial, on_expire=notify_trial_expired, rebuild_runtime=False)
             restored += 1
         except Exception as exc:
             update_trial_status(saved_trial.get("id", 0), "failed")
