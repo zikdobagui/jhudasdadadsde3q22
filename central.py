@@ -21,6 +21,7 @@ DEFAULT_DATABASE_FILES = {
     'database/gift_card.json': {"gift": []},
     'database/info_transmitir.json': {"texto": None, "photo": None, "markup": None},
     'database/custom_descriptions.json': {"descriptions": {}},
+    'database/price_overrides.json': {"prices": {}},
     'database/reserve_verified.json': {},
     'database/users.json': {"users": []},
 }
@@ -1117,6 +1118,7 @@ class FuncaoTransmitir:
 class ControleLogins():
     _registry_lock = threading.RLock()
     _registry_path = 'database/login_registry.json'
+    _price_overrides_path = 'database/price_overrides.json'
     _remote_timeout = 20
 
     @staticmethod
@@ -1137,7 +1139,8 @@ class ControleLogins():
             'url': url,
             'key': key,
             'child_bot_id': child_bot_id,
-            'reseller_admin_id': reseller_admin_id
+            'reseller_admin_id': reseller_admin_id,
+            'sale_price_markup_percent': data.get('sale_price_markup_percent', 0)
         }
 
     @classmethod
@@ -1214,6 +1217,51 @@ class ControleLogins():
     @staticmethod
     def _stock_item_value(item):
         return item.get('valor', item.get('price', 0))
+
+    @staticmethod
+    def _normalizar_servico(nome):
+        return str(nome or '').strip().casefold()
+
+    @classmethod
+    def _load_price_overrides(cls):
+        try:
+            with open_utf8(cls._price_overrides_path, 'r') as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get('prices'), dict):
+                return data
+        except (OSError, json.JSONDecodeError):
+            pass
+        return {"prices": {}}
+
+    @classmethod
+    def _save_price_overrides(cls, data):
+        os.makedirs(os.path.dirname(cls._price_overrides_path), exist_ok=True)
+        with open_utf8(cls._price_overrides_path, 'w') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+
+    @classmethod
+    def _sale_price_for_service(cls, nome, supplier_price=0):
+        overrides = cls._load_price_overrides().get('prices', {})
+        key = cls._normalizar_servico(nome)
+        if key in overrides:
+            try:
+                return float(overrides[key])
+            except (TypeError, ValueError):
+                pass
+
+        config = cls._remote_config() or {}
+        try:
+            markup = float(config.get('sale_price_markup_percent', 0) or 0)
+            base_price = float(supplier_price or 0)
+            if markup > 0:
+                return round(base_price * (1 + markup / 100), 2)
+        except (TypeError, ValueError):
+            pass
+        return supplier_price
+
+    @classmethod
+    def _sale_price_for_item(cls, item):
+        return cls._sale_price_for_service(cls._stock_item_name(item), cls._stock_item_value(item))
 
     @staticmethod
     def _access_tuple(access):
@@ -1295,7 +1343,7 @@ class ControleLogins():
                     if nome.strip().casefold() == str(servico).strip().casefold() and int(item.get('stock', item.get('quantidade', 0))) > 0:
                         return (
                             nome,
-                            cls._stock_item_value(item),
+                            cls._sale_price_for_item(item),
                             '',
                             '',
                             item.get('descricao', ''),
@@ -1372,7 +1420,7 @@ class ControleLogins():
                 lista = []
                 for item in ControleLogins._remote_get_stock() or []:
                     nome = ControleLogins._stock_item_name(item)
-                    valor = ControleLogins._stock_item_value(item)
+                    valor = ControleLogins._sale_price_for_item(item)
                     quantidade = int(item.get('stock', item.get('quantidade', 0)))
                     for _ in range(max(quantidade, 0)):
                         lista.append({"nome": nome, "valor": valor})
@@ -1477,7 +1525,7 @@ class ControleLogins():
                     if termo in texto:
                         resultados.append({
                             "nome": nome,
-                            "valor": ControleLogins._stock_item_value(item),
+                            "valor": ControleLogins._sale_price_for_item(item),
                             "descricao": item.get("descricao", ""),
                             "email": "",
                             "senha": "",
@@ -1555,8 +1603,11 @@ class ControleLogins():
 
     def mudar_valor_por_nome(nome, novo_valor):
         if ControleLogins.usando_estoque_central():
-            print("[ESTOQUE CENTRAL] Alterar valor nao esta disponivel via API.")
-            return False
+            data = ControleLogins._load_price_overrides()
+            data.setdefault('prices', {})[ControleLogins._normalizar_servico(nome)] = float(novo_valor)
+            ControleLogins._save_price_overrides(data)
+            print(f"[ESTOQUE CENTRAL] Preco de venda local de {nome} alterado para {novo_valor}.")
+            return True
 
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
@@ -1569,8 +1620,15 @@ class ControleLogins():
             json.dump(data, f, indent=4)
     def mudar_valor_de_todos(valor):
         if ControleLogins.usando_estoque_central():
-            print("[ESTOQUE CENTRAL] Alterar todos os valores nao esta disponivel via API.")
-            return False
+            data = ControleLogins._load_price_overrides()
+            prices = data.setdefault('prices', {})
+            for item in ControleLogins._remote_get_stock() or []:
+                nome = ControleLogins._stock_item_name(item)
+                if nome:
+                    prices[ControleLogins._normalizar_servico(nome)] = float(valor)
+            ControleLogins._save_price_overrides(data)
+            print(f"[ESTOQUE CENTRAL] Precos de venda locais alterados para {valor}.")
+            return True
 
         with open_utf8('database/acessos.json', 'r') as f:
             data = json.load(f)
@@ -1585,7 +1643,7 @@ class ControleLogins():
                 for item in ControleLogins._remote_get_stock() or []:
                     item_nome = ControleLogins._stock_item_name(item)
                     if item_nome == nome:
-                        return item_nome, ControleLogins._stock_item_value(item), item.get("descricao", ""), item.get("duracao", ""), ""
+                        return item_nome, ControleLogins._sale_price_for_item(item), item.get("descricao", ""), item.get("duracao", ""), ""
             except Exception as exc:
                 print(f"[ESTOQUE CENTRAL] Falha ao buscar informacoes do produto: {exc}")
             return nome, "0.00", "Produto não encontrado", "30", "nao@encontrado.com"
@@ -1639,6 +1697,7 @@ class ControleLogins():
                 acesso = ControleLogins._remote_reserve(servico)
                 if not acesso:
                     return None
+                acesso['valor'] = ControleLogins._sale_price_for_service(servico, acesso.get('valor', 0))
                 return ControleLogins._access_tuple(acesso)
             except Exception as exc:
                 print(f"[ESTOQUE CENTRAL] Falha ao reservar acesso: {exc}")

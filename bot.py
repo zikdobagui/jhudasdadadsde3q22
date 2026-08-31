@@ -1754,7 +1754,8 @@ def painel_admin(message):
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton(f'{gear} Configuracoes Gerais', callback_data='configuracoes_geral'))
         if usa_estoque_central():
-            markup.row(InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
+            markup.row(InlineKeyboardButton(f'{money} Precos de Venda', callback_data='precos_revenda'),
+                       InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
         else:
             markup.row(InlineKeyboardButton(f'{lock} Configurar Logins', callback_data='configurar_logins'),
                        InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
@@ -4439,10 +4440,6 @@ def remover_por_plataforma(message):
         bot.reply_to(message, 'Erro ao remover os logins...')
 
 def mudar_valor_servico(message):
-    if usa_estoque_central():
-        bloquear_estoque_central(message)
-        return
-
     try:
         sep = api.CredentialsChange.separador()
         txt = message.text.strip().split(f'{sep}')
@@ -4456,10 +4453,6 @@ def mudar_valor_servico(message):
         bot.reply_to(message, 'Falha ao mudar o valor. Use, por exemplo: NETFLIX/12.99')
 
 def mudar_valor_todos(message):
-    if usa_estoque_central():
-        bloquear_estoque_central(message)
-        return
-
     try:
         valor = parse_valor_monetario(message.text)
         api.ControleLogins.mudar_valor_de_todos(valor)
@@ -4646,6 +4639,33 @@ def configurar_logins(message):
                InlineKeyboardButton('â€¢ Alterar Valor de Todos', callback_data='mudar_valor_todos'))
     markup.row(InlineKeyboardButton('âœ… Voltar', callback_data='voltar_paineladm'))
     
+    bot.edit_message_text(
+        chat_id=message.chat.id,
+        text=texto,
+        message_id=message.message_id,
+        reply_markup=markup,
+        parse_mode='HTML'
+    )
+
+def configurar_precos_revenda(message):
+    """
+    Menu seguro para bot filho com estoque central: edita somente o preco de venda local.
+    """
+    separador = api.CredentialsChange.separador()
+    texto = (
+        '💰 <b>Precos de venda</b>\n\n'
+        'O estoque vem da API central, entao o admin deste bot nao consegue adicionar, remover ou ver logins.\n\n'
+        'Aqui voce define quanto o cliente final paga neste bot filho. '
+        'O custo do fornecedor continua sendo cobrado separadamente do saldo do revendedor no bot principal.\n\n'
+        f'Para alterar um servico, envie:\n<code>NOME{separador}VALOR</code>\n'
+        f'Exemplo: <code>NETFLIX{separador}12.99</code>'
+    )
+
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('💰 Alterar Servico', callback_data='mudar_valor_servico'))
+    markup.row(InlineKeyboardButton('💰 Alterar Todos', callback_data='mudar_valor_todos'))
+    markup.row(InlineKeyboardButton('✅ Voltar', callback_data='voltar_paineladm'))
+
     bot.edit_message_text(
         chat_id=message.chat.id,
         text=texto,
@@ -9866,13 +9886,13 @@ def callback_query(call):
         'remover_login',
         'remover_por_plataforma',
         'zerar_estoque',
-        'mudar_valor_servico',
-        'mudar_valor_todos',
     }
     if call.data in estoque_admin_callbacks and usa_estoque_central():
         bloquear_estoque_central(call)
         return
 
+    if call.data == 'precos_revenda':
+        configurar_precos_revenda(call.message)
     if call.data == 'configurar_logins':
         configurar_logins(call.message)
     if call.data == 'adicionar_login':

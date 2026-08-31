@@ -61,6 +61,7 @@ Durante o teste, o bot filho roda em `bot_pai/runtime/trial-ID/` e usa:
 - estoque central configurado por `central_stock_api_url` e `central_stock_api_key`;
 - desligamento automatico quando o prazo expira.
 - restauracao automatica apos reiniciar o bot pai, se ainda houver tempo de teste.
+- precos de venda locais no bot filho, sem liberar acesso aos logins do estoque central.
 
 Os testes ativos ficam registrados em `data/trials.json`.
 
@@ -81,6 +82,9 @@ GET /api/stock
 ```
 
 Reservar um login para venda. Essa rota ja remove o login do estoque central.
+Quando o bot filho vende, a API cobra do saldo do revendedor o valor do fornecedor
+registrado no estoque central. O preco exibido e cobrado do cliente final fica no
+proprio bot filho e pode ser ajustado pelo painel em `Precos de Venda`.
 
 ```http
 POST /api/stock/reserve
@@ -89,6 +93,7 @@ Content-Type: application/json
 {
   "service": "NETFLIX",
   "child_bot_id": "1",
+  "reseller_admin_id": "123456789",
   "buyer_id": "123456",
   "sale_id": "pedido-001"
 }
