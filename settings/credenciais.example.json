@@ -12,6 +12,7 @@
   "service_emoji_ids": [],
   "service_emoji_map": {},
   "api-bot": "COLOQUE_O_TOKEN_DO_BOT",
+  "stock_api_key": "COLOQUE_UMA_CHAVE_FORTE_PARA_BOTS_FILHOS",
   "token_mp": "COLOQUE_O_TOKEN_DO_MERCADO_PAGO",
   "separador": "/",
   "afiliados": "off",

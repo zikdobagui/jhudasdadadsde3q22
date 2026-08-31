@@ -1,0 +1,9 @@
+{
+  "bot_token": "COLOQUE_O_TOKEN_DO_BOT_PAI",
+  "stock_api_key": "TROQUE_ESSA_CHAVE_FORTE",
+  "stock_api_port": 80,
+  "admin_ids": [
+    123456789
+  ],
+  "timezone": "America/Sao_Paulo"
+}
