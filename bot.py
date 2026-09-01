@@ -95,6 +95,7 @@ def _patched_button_to_dict(self):
             for fallback, emoji_id in GLOBAL_PREMIUM_EMOJI_IDS.items():
                 if text.startswith(fallback):
                     self.icon_custom_emoji_id = emoji_id
+                    text = text[len(fallback):].lstrip()
                     break
         color_match = re.search(
             r'(?:\[|\{)\s*(?:cor|color|style)\s*:\s*([a-zA-Z_ -]+)\s*(?:\]|\})|<\s*(?:cor|color|style)\s*=\s*["\']?([a-zA-Z_ -]+)["\']?\s*>',
@@ -132,10 +133,10 @@ def _patched_button_to_dict(self):
             self.icon_custom_emoji_id = emoji_match.group(1)
         result['text'] = re.sub(
             r'<tg-emoji\s+emoji-id=["\'][^"\']+["\']>(.*?)</tg-emoji>',
-            lambda m: m.group(1),
+            lambda m: m.group(1).lstrip(),
             text,
             flags=re.IGNORECASE | re.DOTALL
-        )
+        ).lstrip()
     if button_style in ('primary', 'success', 'danger'):
         result['style'] = button_style
     else:
@@ -3109,7 +3110,7 @@ def receber_texto_premios(message, chave):
     if not _admin_only(message):
         return
     config = carregar_config_premios()
-    config.setdefault("textos", {})[chave] = _message_text_with_custom_emoji_html(message).strip()
+    config.setdefault("textos", {})[chave] = aplicar_emojis_premium_globais(_message_text_with_custom_emoji_html(message).strip())
     salvar_config_premios(config)
     bot.reply_to(message, "Texto da central atualizado.")
 
@@ -3586,7 +3587,8 @@ def _message_text_with_custom_emoji_html(message) -> str:
     for entity in entities:
         if getattr(entity, 'type', None) != 'custom_emoji':
             continue
-        custom_emoji_id = getattr(entity, 'custom_emoji_id', None)
+        entity_data = entity.to_dict() if hasattr(entity, 'to_dict') else {}
+        custom_emoji_id = getattr(entity, 'custom_emoji_id', None) or entity_data.get('custom_emoji_id')
         if not custom_emoji_id:
             continue
         start = _utf16_index_to_py_index(text, int(entity.offset))
