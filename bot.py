@@ -741,6 +741,11 @@ MENU_PREMIUM_EMOJI_IDS = {
     "carrinho": "5350486389806868244",
     "notificar": "5447644880824181073",
     "pesquisar": "5210956306952758910",
+    "premios": "5350486389806868244",
+    "caixa": "5350486389806868244",
+    "bonus": "5350486389806868244",
+    "promocoes": "5350693961281314631",
+    "cashback": "5370784581341422520",
 }
 
 def set_menu_premium_icon(button, key: str):
@@ -3048,7 +3053,7 @@ def receber_texto_premios(message, chave):
     if not _admin_only(message):
         return
     config = carregar_config_premios()
-    config.setdefault("textos", {})[chave] = getattr(message, "html_text", None) or message.text or ""
+    config.setdefault("textos", {})[chave] = _message_text_with_custom_emoji_html(message).strip()
     salvar_config_premios(config)
     bot.reply_to(message, "Texto da central atualizado.")
 
@@ -3143,12 +3148,12 @@ def mostrar_central_premios(message_or_call):
     message_id = None if hasattr(message_or_call, 'chat') else message_or_call.message.message_id
     config = carregar_config_premios()
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton('🎁 CAIXA MISTERIOSA', callback_data='premios_caixas'))
+    markup.row(set_menu_premium_icon(InlineKeyboardButton('🎁 CAIXA MISTERIOSA', callback_data='premios_caixas'), 'caixa'))
     markup.row(
-        InlineKeyboardButton('🧩 BÔNUS', callback_data='premios_bonus'),
-        InlineKeyboardButton('🔮 PROMOÇÕES', callback_data='premios_promocoes')
+        set_menu_premium_icon(InlineKeyboardButton('🧩 BÔNUS', callback_data='premios_bonus'), 'bonus'),
+        set_menu_premium_icon(InlineKeyboardButton('🔮 PROMOÇÕES', callback_data='premios_promocoes'), 'promocoes')
     )
-    markup.row(InlineKeyboardButton('👑 CASHBACK', callback_data='clube_vip'))
+    markup.row(set_menu_premium_icon(InlineKeyboardButton('👑 CASHBACK', callback_data='clube_vip'), 'cashback'))
     markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
     texto = config["textos"]["menu"]
     if message_id:
@@ -5629,7 +5634,7 @@ def gerar_menu_principal():
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
     bt_indique = InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe')
-    bt_premios = InlineKeyboardButton(botao_personalizado('central_premios', '🎁 CENTRAL DE PRÊMIOS'), callback_data='central_premios')
+    bt_premios = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('central_premios', '🎁 CENTRAL DE PRÊMIOS'), callback_data='central_premios'), 'premios')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
@@ -9068,7 +9073,14 @@ def callback_query(call):
             bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
             return
         chave = call.data.split('|', 1)[1]
-        msg = bot.send_message(call.message.chat.id, "Envie o novo texto. Pode usar HTML e emojis premium.", reply_markup=types.ForceReply())
+        msg = bot.send_message(
+            call.message.chat.id,
+            (
+                "Envie o novo texto.\n\n"
+                "Pode usar HTML e emoji premium direto na mensagem; eu vou salvar o emoji_id automaticamente."
+            ),
+            reply_markup=types.ForceReply()
+        )
         bot.register_next_step_handler(msg, receber_texto_premios, chave)
         bot.answer_callback_query(call.id)
         return
