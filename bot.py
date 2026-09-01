@@ -3121,6 +3121,7 @@ def receber_botao_premios(message, chave):
     config = carregar_config_premios()
     config.setdefault("botoes", {})[chave] = conteudo
     salvar_config_premios(config)
+    set_button_override(f"premios_{chave}", conteudo)
     bot.reply_to(message, "Botão da central atualizado com o emoji premium enviado.")
 
 def receber_caixa_premios(message, index=None):
@@ -3215,13 +3216,13 @@ def mostrar_central_premios(message_or_call):
     config = carregar_config_premios()
     botoes = config["botoes"]
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton(botoes["caixa"], callback_data='premios_caixas'))
+    markup.row(InlineKeyboardButton(botao_personalizado("premios_caixa", botoes["caixa"]), callback_data='premios_caixas'))
     markup.row(
-        InlineKeyboardButton(botoes["bonus"], callback_data='premios_bonus'),
-        InlineKeyboardButton(botoes["promocoes"], callback_data='premios_promocoes')
+        InlineKeyboardButton(botao_personalizado("premios_bonus", botoes["bonus"]), callback_data='premios_bonus'),
+        InlineKeyboardButton(botao_personalizado("premios_promocoes", botoes["promocoes"]), callback_data='premios_promocoes')
     )
-    markup.row(InlineKeyboardButton(botoes["cashback"], callback_data='clube_vip'))
-    markup.row(InlineKeyboardButton(botoes["voltar"], callback_data='menu_start'))
+    markup.row(InlineKeyboardButton(botao_personalizado("premios_cashback", botoes["cashback"]), callback_data='clube_vip'))
+    markup.row(InlineKeyboardButton(botao_personalizado("premios_voltar", botoes["voltar"]), callback_data='menu_start'))
     texto = config["textos"]["menu"]
     if message_id:
         bot.edit_message_text(texto, chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
@@ -3857,6 +3858,9 @@ def mostrar_menu_botoes(message):
     if not _admin_only(message):
         bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
         return
+    premios_botoes = carregar_config_premios().get("botoes", {})
+    for chave, padrao in premios_default_config()["botoes"].items():
+        botao_personalizado(f"premios_{chave}", premios_botoes.get(chave, padrao))
     files = _list_botoes_files()
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton('ðŸ“¦ BotÃµes dos Produtos', callback_data='edit_service_buttons'))
