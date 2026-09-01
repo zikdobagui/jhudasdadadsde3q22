@@ -1773,6 +1773,7 @@ def painel_admin(message):
         markup.row(InlineKeyboardButton(f'{soccer}{movie} Jogos e Filmes', callback_data='gerenciar_jogos_filmes'))
         markup.row(InlineKeyboardButton('🎰 Configurar Roleta', callback_data='admin_roleta'),
                    InlineKeyboardButton(f'{check} Gift Card', callback_data='gift_card'))
+        markup.row(InlineKeyboardButton('🎁 Central de Premios', callback_data='admin_premios'))
         markup.row(InlineKeyboardButton(f'{chart} Consultar Vendas', callback_data='menu_vendas'),
                    InlineKeyboardButton(f'{floppy} Gerenciar Backups', callback_data='menu_backups'))
         markup.row(InlineKeyboardButton(f'{megaphone} Transmitir a Todos', callback_data='configurar_usuarios'))
@@ -2697,6 +2698,7 @@ def _admin_only(message_or_call) -> bool:
 
 ROLETA_CONFIG_PATH = 'settings/roleta.json'
 ROLETA_GIROS_PATH = 'database/roleta_giros.json'
+PREMIOS_CONFIG_PATH = 'settings/premios.json'
 
 def _read_json_file(path, default):
     try:
@@ -2741,6 +2743,69 @@ def carregar_config_roleta():
 
 def salvar_config_roleta(config):
     _write_json_file(ROLETA_CONFIG_PATH, config)
+
+def premios_default_config():
+    return {
+        "status": "off",
+        "textos": {
+            "menu": "🎁 <b>Central de Prêmios e Vantagens!</b>\n\nUse o bot ao seu favor e ganhe recompensas incríveis. Escolha uma das opções abaixo para aproveitar:",
+            "caixas": "🎁 <b>CAIXAS MISTERIOSAS</b> 🎁\n\nTente a sorte! Abra uma das nossas caixas e ganhe um Aplicativo Aleatório.\n\n{caixas}\n\n<i>Você tem coragem? Escolha a sua e descubra o que te aguarda!</i>",
+            "bonus": "🧩 <b>BÔNUS / MISSÕES</b>\n\nComplete as tarefas de hoje para liberar recompensas especiais.\n\n{tarefas}",
+            "promocoes": "🎉 <b>Nossas Promoções Especiais:</b>",
+        },
+        "caixas": [
+            {"nome": "Caixa Básica", "valor": 5.0, "ativo": True},
+            {"nome": "Caixa Padrão", "valor": 8.0, "ativo": True},
+            {"nome": "Caixa Premium", "valor": 25.0, "ativo": True},
+        ],
+        "promocoes": []
+    }
+
+def carregar_config_premios():
+    config = premios_default_config()
+    saved = _read_json_file(PREMIOS_CONFIG_PATH, config)
+    if isinstance(saved, dict):
+        config.update(saved)
+        textos = premios_default_config()["textos"]
+        textos.update(saved.get("textos", {}) if isinstance(saved.get("textos"), dict) else {})
+        config["textos"] = textos
+    config["status"] = "on" if config.get("status") == "on" else "off"
+    config["caixas"] = config.get("caixas") if isinstance(config.get("caixas"), list) else []
+    config["promocoes"] = config.get("promocoes") if isinstance(config.get("promocoes"), list) else []
+    return config
+
+def salvar_config_premios(config):
+    _write_json_file(PREMIOS_CONFIG_PATH, config)
+
+def premios_ativo():
+    return carregar_config_premios().get("status") == "on"
+
+def usuario_cumpriu_missoes(user_id):
+    hoje = datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y')
+    user_data = database.load_user_data(user_id) or {}
+    compras = user_data.get("compras", [])
+    pagamentos = user_data.get("pagamentos", [])
+    fez_compra = any(hoje in str(compra.get("data", "")) for compra in compras)
+    fez_recarga = any(hoje in str(pag.get("data", "")) for pag in pagamentos)
+    return fez_compra, fez_recarga
+
+def texto_tarefas_premios(user_id):
+    fez_compra, fez_recarga = usuario_cumpriu_missoes(user_id)
+    return (
+        f"{'✅' if fez_compra else '❌'} Fazer pelo menos 1 compra no dia.\n"
+        f"{'✅' if fez_recarga else '❌'} Fazer pelo menos 1 recarga no dia."
+    )
+
+def servicos_unicos_disponiveis():
+    servicos = []
+    vistos = set()
+    for item in api.ControleLogins.pegar_servicos():
+        nome = str(item.get("nome", "")).strip()
+        if not nome or nome.casefold() in vistos:
+            continue
+        vistos.add(nome.casefold())
+        servicos.append(nome)
+    return servicos
 
 def roleta_ativa():
     return carregar_config_roleta().get("status") == "on"
@@ -2912,6 +2977,119 @@ def mostrar_admin_roleta(message):
     except Exception:
         bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
 
+def mostrar_admin_premios(message):
+    if not _admin_only(message):
+        bot.reply_to(message, 'Sem permissão.')
+        return
+    config = carregar_config_premios()
+    status = "Ativada" if config.get("status") == "on" else "Desativada"
+    texto = (
+        "🎁 <b>CONFIGURAR CENTRAL DE PRÊMIOS</b>\n\n"
+        f"Status no /start: <b>{status}</b>\n"
+        f"Caixas: <code>{len(config.get('caixas', []))}</code>\n"
+        f"Promoções: <code>{len(config.get('promocoes', []))}</code>\n\n"
+        "Edite textos com HTML e emojis premium pelo próprio Telegram."
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("Ativar/Desativar", callback_data="premios_admin_toggle"))
+    markup.row(InlineKeyboardButton("Editar Textos", callback_data="premios_admin_textos"))
+    markup.row(InlineKeyboardButton("Configurar Caixas", callback_data="premios_admin_caixas"))
+    markup.row(InlineKeyboardButton("Configurar Promoções", callback_data="premios_admin_promos"))
+    markup.row(InlineKeyboardButton("Voltar", callback_data="voltar_paineladm"))
+    try:
+        bot.edit_message_text(texto, chat_id=message.chat.id, message_id=message.message_id, parse_mode='HTML', reply_markup=markup)
+    except Exception:
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_admin_premios_textos(message):
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("Texto Menu", callback_data="premios_texto|menu"))
+    markup.row(InlineKeyboardButton("Texto Caixas", callback_data="premios_texto|caixas"))
+    markup.row(InlineKeyboardButton("Texto Bônus", callback_data="premios_texto|bonus"))
+    markup.row(InlineKeyboardButton("Texto Promoções", callback_data="premios_texto|promocoes"))
+    markup.row(InlineKeyboardButton("Voltar", callback_data="admin_premios"))
+    bot.edit_message_text("Escolha qual texto deseja editar.", chat_id=message.chat.id, message_id=message.message_id, reply_markup=markup)
+
+def mostrar_admin_premios_caixas(message):
+    config = carregar_config_premios()
+    markup = InlineKeyboardMarkup()
+    linhas = ["🎁 <b>Caixas misteriosas</b>\n"]
+    for index, caixa in enumerate(config.get("caixas", [])):
+        status = "on" if caixa.get("ativo", True) else "off"
+        valor = float(caixa.get("valor", 0) or 0)
+        nome = str(caixa.get("nome", "Caixa"))
+        linhas.append(f"{index + 1}. {html.escape(nome)} - R${valor:.2f} - <code>{status}</code>")
+        markup.row(
+            InlineKeyboardButton(f"Editar {index + 1}", callback_data=f"premios_caixa_edit|{index}"),
+            InlineKeyboardButton(f"On/Off {index + 1}", callback_data=f"premios_caixa_toggle|{index}")
+        )
+    markup.row(InlineKeyboardButton("Adicionar Caixa", callback_data="premios_caixa_add"))
+    markup.row(InlineKeyboardButton("Voltar", callback_data="admin_premios"))
+    bot.edit_message_text("\n".join(linhas), chat_id=message.chat.id, message_id=message.message_id, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_admin_premios_promos(message):
+    config = carregar_config_premios()
+    markup = InlineKeyboardMarkup()
+    linhas = ["🔮 <b>Promoções</b>\n"]
+    for index, promo in enumerate(config.get("promocoes", [])):
+        status = "on" if promo.get("ativo", True) else "off"
+        valor = float(promo.get("valor", 0) or 0)
+        nome = str(promo.get("servico", "Promoção"))
+        linhas.append(f"{index + 1}. {html.escape(nome)} - R${valor:.2f} - <code>{status}</code>")
+        markup.row(
+            InlineKeyboardButton(f"Editar {index + 1}", callback_data=f"premios_promo_edit|{index}"),
+            InlineKeyboardButton(f"On/Off {index + 1}", callback_data=f"premios_promo_toggle|{index}")
+        )
+    markup.row(InlineKeyboardButton("Adicionar Promoção", callback_data="premios_promo_add"))
+    markup.row(InlineKeyboardButton("Voltar", callback_data="admin_premios"))
+    bot.edit_message_text("\n".join(linhas), chat_id=message.chat.id, message_id=message.message_id, parse_mode='HTML', reply_markup=markup)
+
+def receber_texto_premios(message, chave):
+    if not _admin_only(message):
+        return
+    config = carregar_config_premios()
+    config.setdefault("textos", {})[chave] = getattr(message, "html_text", None) or message.text or ""
+    salvar_config_premios(config)
+    bot.reply_to(message, "Texto da central atualizado.")
+
+def receber_caixa_premios(message, index=None):
+    if not _admin_only(message):
+        return
+    try:
+        nome, valor = [parte.strip() for parte in (message.text or "").split(api.CredentialsChange.separador(), 1)]
+        valor = parse_valor_monetario(valor)
+    except Exception:
+        bot.reply_to(message, f"Formato inválido. Use: Nome{api.CredentialsChange.separador()}5.00")
+        return
+    config = carregar_config_premios()
+    caixa = {"nome": nome, "valor": valor, "ativo": True}
+    if index is None:
+        config.setdefault("caixas", []).append(caixa)
+    elif 0 <= index < len(config.get("caixas", [])):
+        caixa["ativo"] = config["caixas"][index].get("ativo", True)
+        config["caixas"][index] = caixa
+    salvar_config_premios(config)
+    bot.reply_to(message, "Caixa salva.")
+
+def receber_promo_premios(message, index=None):
+    if not _admin_only(message):
+        return
+    try:
+        servico, valor = [parte.strip() for parte in (message.text or "").split(api.CredentialsChange.separador(), 1)]
+        valor = parse_valor_monetario(valor)
+    except Exception:
+        bot.reply_to(message, f"Formato inválido. Use: NETFLIX{api.CredentialsChange.separador()}25.00")
+        return
+    config = carregar_config_premios()
+    promo = {"servico": servico, "valor": valor, "ativo": True}
+    if index is None:
+        config.setdefault("promocoes", []).append(promo)
+    elif 0 <= index < len(config.get("promocoes", [])):
+        promo["ativo"] = config["promocoes"][index].get("ativo", True)
+        config["promocoes"][index] = promo
+    salvar_config_premios(config)
+    bot.reply_to(message, "Promoção salva.")
+
 def pedir_config_roleta(message, campo, titulo):
     msg = bot.send_message(
         message.chat.id,
@@ -2959,6 +3137,121 @@ def salvar_config_roleta_admin(message, campo):
 @bot.message_handler(commands=['roleta_admin'])
 def comando_roleta_admin(message):
     mostrar_admin_roleta(message)
+
+def mostrar_central_premios(message_or_call):
+    chat_id = message_or_call.chat.id if hasattr(message_or_call, 'chat') else message_or_call.message.chat.id
+    message_id = None if hasattr(message_or_call, 'chat') else message_or_call.message.message_id
+    config = carregar_config_premios()
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('🎁 CAIXA MISTERIOSA', callback_data='premios_caixas'))
+    markup.row(
+        InlineKeyboardButton('🧩 BÔNUS', callback_data='premios_bonus'),
+        InlineKeyboardButton('🔮 PROMOÇÕES', callback_data='premios_promocoes')
+    )
+    markup.row(InlineKeyboardButton('👑 CASHBACK', callback_data='clube_vip'))
+    markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+    texto = config["textos"]["menu"]
+    if message_id:
+        bot.edit_message_text(texto, chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+    else:
+        bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_caixas_premios(call):
+    config = carregar_config_premios()
+    caixas = [caixa for caixa in config.get("caixas", []) if caixa.get("ativo", True)]
+    linhas = []
+    markup = InlineKeyboardMarkup()
+    for index, caixa in enumerate(caixas):
+        valor = float(caixa.get("valor", 0) or 0)
+        nome = str(caixa.get("nome", "Caixa"))
+        linhas.append(f"🎁 <b>{html.escape(nome)}:</b> R$ {valor:.2f}")
+        markup.row(InlineKeyboardButton(f"🎁 {nome} (R$ {valor:.2f})", callback_data=f"premios_abrir_caixa|{index}"))
+    markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
+    texto = config["textos"]["caixas"].replace("{caixas}", "\n".join(linhas) if linhas else "Nenhuma caixa ativa no momento.")
+    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_bonus_premios(call):
+    config = carregar_config_premios()
+    texto = config["textos"]["bonus"].replace("{tarefas}", texto_tarefas_premios(call.from_user.id))
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('🛒 Comprar para completar', callback_data='servicos'))
+    markup.row(InlineKeyboardButton('💳 Recarregar saldo', callback_data='addsaldo'))
+    markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
+    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+
+def mostrar_promocoes_premios(call):
+    config = carregar_config_premios()
+    promos = [promo for promo in config.get("promocoes", []) if promo.get("ativo", True)]
+    markup = InlineKeyboardMarkup()
+    texto = config["textos"]["promocoes"]
+    if promos:
+        for index, promo in enumerate(promos):
+            nome = str(promo.get("servico", promo.get("nome", "Promoção")))
+            valor = float(promo.get("valor", 0) or 0)
+            markup.row(InlineKeyboardButton(f"🎉 {nome} - R${valor:.2f}", callback_data=f"premios_comprar_promo|{index}"))
+    else:
+        texto += "\n\nNenhuma promoção ativa no momento."
+    markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
+    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+
+def entregar_premio_servico(call, servico, valor_cobrado, origem):
+    user_id = call.from_user.id
+    if database.load_user_data(user_id) is None:
+        database.initialize_user(user_id, getattr(call.from_user, 'username', None))
+    saldo = float(api.InfoUser.saldo(user_id))
+    if saldo < float(valor_cobrado):
+        bot.answer_callback_query(call.id, f"Saldo insuficiente! Faltam R${float(valor_cobrado) - saldo:.2f}", show_alert=True)
+        return
+    resultado = api.ControleLogins.pegar_primeiro_disponivel(servico)
+    if not resultado:
+        bot.answer_callback_query(call.id, "Serviço esgotado ou indisponível.", show_alert=True)
+        return
+    nome, _valor_original, email, senha, descricao, duracao = resultado
+    api.InfoUser.tirar_saldo(user_id, valor_cobrado)
+    api.InfoUser.add_compras(user_id, nome, valor_cobrado, email, senha)
+    aplicar_cashback_vip(user_id, valor_cobrado)
+    texto = (
+        f"🎁 <b>{html.escape(origem)}</b>\n\n"
+        f"Você recebeu: <b>{html.escape(str(nome))}</b>\n"
+        f"Valor pago: <b>R${float(valor_cobrado):.2f}</b>\n\n"
+        f"Login: <code>{html.escape(str(email))}</code>\n"
+        f"Senha: <code>{html.escape(str(senha))}</code>\n"
+        f"Duração: <b>{html.escape(str(duracao))}</b>\n\n"
+        f"{html.escape(str(descricao))}"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('↩️ Voltar aos Prêmios', callback_data='central_premios'))
+    bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+    bot.answer_callback_query(call.id, "Prêmio entregue!", show_alert=True)
+
+def abrir_caixa_premios(call):
+    config = carregar_config_premios()
+    try:
+        index = int(call.data.split('|', 1)[1])
+        caixas = [caixa for caixa in config.get("caixas", []) if caixa.get("ativo", True)]
+        caixa = caixas[index]
+    except Exception:
+        bot.answer_callback_query(call.id, "Caixa inválida.", show_alert=True)
+        return
+    fez_compra, fez_recarga = usuario_cumpriu_missoes(call.from_user.id)
+    if not (fez_compra and fez_recarga):
+        bot.answer_callback_query(call.id, "Complete as tarefas de hoje antes de abrir uma caixa.", show_alert=True)
+        return
+    servicos = servicos_unicos_disponiveis()
+    if not servicos:
+        bot.answer_callback_query(call.id, "Nenhum prêmio disponível no estoque.", show_alert=True)
+        return
+    entregar_premio_servico(call, random.choice(servicos), float(caixa.get("valor", 0) or 0), caixa.get("nome", "Caixa Misteriosa"))
+
+def comprar_promocao_premios(call):
+    config = carregar_config_premios()
+    try:
+        index = int(call.data.split('|', 1)[1])
+        promo = [p for p in config.get("promocoes", []) if p.get("ativo", True)][index]
+    except Exception:
+        bot.answer_callback_query(call.id, "Promoção inválida.", show_alert=True)
+        return
+    entregar_premio_servico(call, promo.get("servico", ""), float(promo.get("valor", 0) or 0), "Promoção Especial")
 
 def total_comissao_indicacao(user_id):
     user_data = database.load_user_data(user_id)
@@ -5336,6 +5629,7 @@ def gerar_menu_principal():
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
     bt_indique = InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe')
+    bt_premios = InlineKeyboardButton(botao_personalizado('central_premios', '🎁 CENTRAL DE PRÊMIOS'), callback_data='central_premios')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
@@ -5349,6 +5643,8 @@ def gerar_menu_principal():
     markup.row(bt_carrinho, bt_historico)
     markup.add(bt_notificar)
     markup.add(bt_indique)
+    if premios_ativo():
+        markup.add(bt_premios)
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
@@ -8712,6 +9008,125 @@ def callback_query(call):
             bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
             return
         mostrar_menu_descricoes(call.message)
+        return
+
+    # =====================
+    # Central de Premios
+    # =====================
+    if call.data == 'central_premios':
+        if not premios_ativo():
+            bot.answer_callback_query(call.id, "Central de prêmios desativada.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_central_premios(call)
+        return
+    if call.data == 'premios_caixas':
+        bot.answer_callback_query(call.id)
+        mostrar_caixas_premios(call)
+        return
+    if call.data == 'premios_bonus':
+        bot.answer_callback_query(call.id)
+        mostrar_bonus_premios(call)
+        return
+    if call.data == 'premios_promocoes':
+        bot.answer_callback_query(call.id)
+        mostrar_promocoes_premios(call)
+        return
+    if call.data.startswith('premios_abrir_caixa|'):
+        abrir_caixa_premios(call)
+        return
+    if call.data.startswith('premios_comprar_promo|'):
+        comprar_promocao_premios(call)
+        return
+
+    if call.data == 'admin_premios':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_premios(call.message)
+        return
+    if call.data == 'premios_admin_toggle':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        config = carregar_config_premios()
+        config["status"] = "off" if config.get("status") == "on" else "on"
+        salvar_config_premios(config)
+        bot.answer_callback_query(call.id, "Central atualizada.", show_alert=True)
+        mostrar_admin_premios(call.message)
+        return
+    if call.data == 'premios_admin_textos':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_premios_textos(call.message)
+        return
+    if call.data.startswith('premios_texto|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        chave = call.data.split('|', 1)[1]
+        msg = bot.send_message(call.message.chat.id, "Envie o novo texto. Pode usar HTML e emojis premium.", reply_markup=types.ForceReply())
+        bot.register_next_step_handler(msg, receber_texto_premios, chave)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data == 'premios_admin_caixas':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_premios_caixas(call.message)
+        return
+    if call.data == 'premios_caixa_add' or call.data.startswith('premios_caixa_edit|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        index = int(call.data.split('|', 1)[1]) if '|' in call.data else None
+        msg = bot.send_message(call.message.chat.id, f"Envie nome e valor da caixa:\n<code>Caixa Premium{api.CredentialsChange.separador()}25.00</code>", parse_mode='HTML', reply_markup=types.ForceReply())
+        bot.register_next_step_handler(msg, receber_caixa_premios, index)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data.startswith('premios_caixa_toggle|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        index = int(call.data.split('|', 1)[1])
+        config = carregar_config_premios()
+        if 0 <= index < len(config.get("caixas", [])):
+            config["caixas"][index]["ativo"] = not config["caixas"][index].get("ativo", True)
+            salvar_config_premios(config)
+        bot.answer_callback_query(call.id, "Caixa atualizada.", show_alert=True)
+        mostrar_admin_premios_caixas(call.message)
+        return
+    if call.data == 'premios_admin_promos':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_premios_promos(call.message)
+        return
+    if call.data == 'premios_promo_add' or call.data.startswith('premios_promo_edit|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        index = int(call.data.split('|', 1)[1]) if '|' in call.data else None
+        msg = bot.send_message(call.message.chat.id, f"Envie serviço e preço promocional:\n<code>NETFLIX{api.CredentialsChange.separador()}25.00</code>", parse_mode='HTML', reply_markup=types.ForceReply())
+        bot.register_next_step_handler(msg, receber_promo_premios, index)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data.startswith('premios_promo_toggle|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
+            return
+        index = int(call.data.split('|', 1)[1])
+        config = carregar_config_premios()
+        if 0 <= index < len(config.get("promocoes", [])):
+            config["promocoes"][index]["ativo"] = not config["promocoes"][index].get("ativo", True)
+            salvar_config_premios(config)
+        bot.answer_callback_query(call.id, "Promoção atualizada.", show_alert=True)
+        mostrar_admin_premios_promos(call.message)
         return
 
     # Selecionar um produto para editar descriÃ§Ã£o
