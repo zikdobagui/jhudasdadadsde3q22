@@ -41,24 +41,6 @@ from datetime import timezone
 from pytz import timezone
 from database import get_user_balance, add_saldo, add_pagamento, get_top_users
 
-GLOBAL_PREMIUM_EMOJI_IDS = {
-    "🎁": "5350486389806868244",
-    "👑": "5370784581341422520",
-    "💰": "5456140674028019486",
-    "💳": "5456140674028019486",
-    "🛒": "5229064374403998351",
-    "🛍️": "5229064374403998351",
-    "📦": "5231200819986047254",
-    "🔎": "5210956306952758910",
-    "🔍": "5210956306952758910",
-    "✅": "5350486389806868244",
-    "⚠️": "5447644880824181073",
-    "🌐": "5447410659077661506",
-    "⭐": "5370784581341422520",
-    "🔮": "5350693961281314631",
-    "🧩": "5350486389806868244",
-}
-
 def service_callback_token(servico):
     return hashlib.sha1(str(servico).strip().casefold().encode('utf-8')).hexdigest()[:16]
 
@@ -91,12 +73,6 @@ def _patched_button_to_dict(self):
     if isinstance(text, str):
         if 'fix_mojibake_text' in globals():
             text = fix_mojibake_text(text)
-        if not getattr(self, 'icon_custom_emoji_id', None):
-            for fallback, emoji_id in GLOBAL_PREMIUM_EMOJI_IDS.items():
-                if text.startswith(fallback):
-                    self.icon_custom_emoji_id = emoji_id
-                    text = text[len(fallback):].lstrip()
-                    break
         color_match = re.search(
             r'(?:\[|\{)\s*(?:cor|color|style)\s*:\s*([a-zA-Z_ -]+)\s*(?:\]|\})|<\s*(?:cor|color|style)\s*=\s*["\']?([a-zA-Z_ -]+)["\']?\s*>',
             text,
@@ -131,9 +107,12 @@ def _patched_button_to_dict(self):
         )
         if emoji_match and not getattr(self, 'icon_custom_emoji_id', None):
             self.icon_custom_emoji_id = emoji_match.group(1)
+        # Inline buttons render custom emojis through icon_custom_emoji_id. The
+        # fallback inside <tg-emoji> must not remain in text or Telegram shows
+        # both the animated icon and the standard emoji.
         result['text'] = re.sub(
             r'<tg-emoji\s+emoji-id=["\'][^"\']+["\']>(.*?)</tg-emoji>',
-            lambda m: m.group(1).lstrip(),
+            '',
             text,
             flags=re.IGNORECASE | re.DOTALL
         ).lstrip()
@@ -497,27 +476,10 @@ def custom_emoji(emoji_id: str, fallback: str) -> str:
     return f'<tg-emoji emoji-id="{html.escape(emoji_id)}">{html.escape(str(fallback))}</tg-emoji>'
 
 def aplicar_emojis_premium_globais(text: str) -> str:
+    """Preserva emojis premium reais sem tentar adivinhar IDs pelo fallback."""
     if not isinstance(text, str) or not text:
         return text
-
-    placeholders = {}
-
-    def keep_existing(match):
-        key = f"__TG_EMOJI_{len(placeholders)}__"
-        placeholders[key] = match.group(0)
-        return key
-
-    result = re.sub(
-        r'<tg-emoji\s+emoji-id=["\'][^"\']+["\']\s*>.*?</tg-emoji>',
-        keep_existing,
-        text,
-        flags=re.IGNORECASE | re.DOTALL
-    )
-    for fallback, emoji_id in sorted(GLOBAL_PREMIUM_EMOJI_IDS.items(), key=lambda item: len(item[0]), reverse=True):
-        result = result.replace(fallback, custom_emoji(emoji_id, fallback))
-    for key, value in placeholders.items():
-        result = result.replace(key, value)
-    return result
+    return text
 
 def strip_tg_emoji_tags(text: str) -> str:
     return re.sub(
