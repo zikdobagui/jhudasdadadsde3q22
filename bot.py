@@ -2777,6 +2777,13 @@ def premios_default_config():
             "bonus": "🧩 <b>BÔNUS / MISSÕES</b>\n\nComplete as tarefas de hoje para liberar recompensas especiais.\n\n{tarefas}",
             "promocoes": "🎉 <b>Nossas Promoções Especiais:</b>",
         },
+        "botoes": {
+            "caixa": "🎁 CAIXA MISTERIOSA",
+            "bonus": "🧩 BÔNUS",
+            "promocoes": "🔮 PROMOÇÕES",
+            "cashback": "👑 CASHBACK",
+            "voltar": "↩️ VOLTAR",
+        },
         "caixas": [
             {"nome": "Caixa Básica", "valor": 5.0, "ativo": True},
             {"nome": "Caixa Padrão", "valor": 8.0, "ativo": True},
@@ -2793,6 +2800,9 @@ def carregar_config_premios():
         textos = premios_default_config()["textos"]
         textos.update(saved.get("textos", {}) if isinstance(saved.get("textos"), dict) else {})
         config["textos"] = textos
+        botoes = premios_default_config()["botoes"]
+        botoes.update(saved.get("botoes", {}) if isinstance(saved.get("botoes"), dict) else {})
+        config["botoes"] = botoes
     config["status"] = "on" if config.get("status") == "on" else "off"
     config["caixas"] = config.get("caixas") if isinstance(config.get("caixas"), list) else []
     config["promocoes"] = config.get("promocoes") if isinstance(config.get("promocoes"), list) else []
@@ -3017,6 +3027,7 @@ def mostrar_admin_premios(message):
     markup = InlineKeyboardMarkup()
     markup.row(InlineKeyboardButton("Ativar/Desativar", callback_data="premios_admin_toggle"))
     markup.row(InlineKeyboardButton("Editar Textos", callback_data="premios_admin_textos"))
+    markup.row(InlineKeyboardButton("Editar Botões", callback_data="premios_admin_botoes"))
     markup.row(InlineKeyboardButton("Configurar Caixas", callback_data="premios_admin_caixas"))
     markup.row(InlineKeyboardButton("Configurar Promoções", callback_data="premios_admin_promos"))
     markup.row(InlineKeyboardButton("Voltar", callback_data="voltar_paineladm"))
@@ -3033,6 +3044,25 @@ def mostrar_admin_premios_textos(message):
     markup.row(InlineKeyboardButton("Texto Promoções", callback_data="premios_texto|promocoes"))
     markup.row(InlineKeyboardButton("Voltar", callback_data="admin_premios"))
     bot.edit_message_text("Escolha qual texto deseja editar.", chat_id=message.chat.id, message_id=message.message_id, reply_markup=markup)
+
+def mostrar_admin_premios_botoes(message):
+    config = carregar_config_premios()
+    nomes = {
+        "caixa": "Caixa Misteriosa",
+        "bonus": "Bônus",
+        "promocoes": "Promoções",
+        "cashback": "Cashback",
+        "voltar": "Voltar",
+    }
+    markup = InlineKeyboardMarkup()
+    for chave, nome in nomes.items():
+        markup.row(InlineKeyboardButton(f"Editar {nome}", callback_data=f"premios_botao|{chave}"))
+    markup.row(InlineKeyboardButton("Voltar", callback_data="admin_premios"))
+    texto = (
+        "Escolha o botão que deseja editar.\n\n"
+        "Envie o nome do botão junto com o emoji premium desejado."
+    )
+    bot.edit_message_text(texto, chat_id=message.chat.id, message_id=message.message_id, reply_markup=markup)
 
 def mostrar_admin_premios_caixas(message):
     config = carregar_config_premios()
@@ -3075,6 +3105,23 @@ def receber_texto_premios(message, chave):
     config.setdefault("textos", {})[chave] = aplicar_emojis_premium_globais(_message_text_with_custom_emoji_html(message).strip())
     salvar_config_premios(config)
     bot.reply_to(message, "Texto da central atualizado.")
+
+def receber_botao_premios(message, chave):
+    if not _admin_only(message):
+        return
+    botoes_validos = {"caixa", "bonus", "promocoes", "cashback", "voltar"}
+    if chave not in botoes_validos:
+        bot.reply_to(message, "Botão inválido.")
+        return
+    conteudo = _message_text_with_custom_emoji_html(message).strip()
+    texto_visivel = strip_tg_emoji_tags(conteudo).strip()
+    if not texto_visivel:
+        bot.reply_to(message, "Envie também o nome que aparecerá no botão.")
+        return
+    config = carregar_config_premios()
+    config.setdefault("botoes", {})[chave] = conteudo
+    salvar_config_premios(config)
+    bot.reply_to(message, "Botão da central atualizado com o emoji premium enviado.")
 
 def receber_caixa_premios(message, index=None):
     if not _admin_only(message):
@@ -3166,14 +3213,15 @@ def mostrar_central_premios(message_or_call):
     chat_id = message_or_call.chat.id if hasattr(message_or_call, 'chat') else message_or_call.message.chat.id
     message_id = None if hasattr(message_or_call, 'chat') else message_or_call.message.message_id
     config = carregar_config_premios()
+    botoes = config["botoes"]
     markup = InlineKeyboardMarkup()
-    markup.row(set_menu_premium_icon(InlineKeyboardButton('🎁 CAIXA MISTERIOSA', callback_data='premios_caixas'), 'caixa'))
+    markup.row(InlineKeyboardButton(botoes["caixa"], callback_data='premios_caixas'))
     markup.row(
-        set_menu_premium_icon(InlineKeyboardButton('🧩 BÔNUS', callback_data='premios_bonus'), 'bonus'),
-        set_menu_premium_icon(InlineKeyboardButton('🔮 PROMOÇÕES', callback_data='premios_promocoes'), 'promocoes')
+        InlineKeyboardButton(botoes["bonus"], callback_data='premios_bonus'),
+        InlineKeyboardButton(botoes["promocoes"], callback_data='premios_promocoes')
     )
-    markup.row(set_menu_premium_icon(InlineKeyboardButton('👑 CASHBACK', callback_data='clube_vip'), 'cashback'))
-    markup.row(InlineKeyboardButton('↩️ VOLTAR', callback_data='menu_start'))
+    markup.row(InlineKeyboardButton(botoes["cashback"], callback_data='clube_vip'))
+    markup.row(InlineKeyboardButton(botoes["voltar"], callback_data='menu_start'))
     texto = config["textos"]["menu"]
     if message_id:
         bot.edit_message_text(texto, chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
@@ -9088,6 +9136,13 @@ def callback_query(call):
         bot.answer_callback_query(call.id)
         mostrar_admin_premios_textos(call.message)
         return
+    if call.data == 'premios_admin_botoes':
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        bot.answer_callback_query(call.id)
+        mostrar_admin_premios_botoes(call.message)
+        return
     if call.data.startswith('premios_texto|'):
         if not _admin_only(call):
             bot.answer_callback_query(call.id, 'â€¢ Sem permissÃ£o.', show_alert=True)
@@ -9102,6 +9157,22 @@ def callback_query(call):
             reply_markup=types.ForceReply()
         )
         bot.register_next_step_handler(msg, receber_texto_premios, chave)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data.startswith('premios_botao|'):
+        if not _admin_only(call):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        chave = call.data.split('|', 1)[1]
+        msg = bot.send_message(
+            call.message.chat.id,
+            (
+                "Envie o novo botão completo.\n\n"
+                "Exemplo: envie seu emoji premium seguido de CAIXA MISTERIOSA."
+            ),
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(msg, receber_botao_premios, chave)
         bot.answer_callback_query(call.id)
         return
     if call.data == 'premios_admin_caixas':
