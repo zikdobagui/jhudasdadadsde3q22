@@ -5331,6 +5331,7 @@ def gerar_menu_principal():
     bt_grupo_whatsapp = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupo_whatsapp', 'GRUPO WHATSAPP'), url=api.CredentialsChange.SuporteInfo.link_suporte()), 'whatsapp')
     # bt_alugar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('menu_alugar_servidor', 'ALUGAR SERVIDOR'), callback_data='alugar_bot'), 'alugar')
     bt_carrinho = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('carrinho', 'CARRINHO'), callback_data='ver_carrinho'), 'carrinho')
+    bt_historico = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data='baixar_historico_self')
     bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
@@ -5345,7 +5346,8 @@ def gerar_menu_principal():
     # markup.add(bt_filmes)
     markup.row(bt_estoque, bt_grupo_telegram)
     markup.add(bt_grupo_whatsapp)
-    markup.row(bt_carrinho, bt_notificar)
+    markup.row(bt_carrinho, bt_historico)
+    markup.add(bt_notificar)
     markup.add(bt_indique)
     if roleta_ativa():
         markup.add(bt_roleta)
@@ -10114,6 +10116,11 @@ def callback_query(call):
             reply_markup=types.ForceReply()
         )
         bot.register_next_step_handler(call.message, mudar_saldo, id)
+    if call.data == 'baixar_historico_self':
+        id = call.from_user.id
+        api.InfoUser.fazer_txt_do_historico(id)
+        with open(f'historicos/{id}.txt', 'rb') as file:
+            bot.send_document(call.message.chat.id, document=file)
     if call.data.split()[0] == 'baixar_historico':
         id = call.data.split()[1]
         api.InfoUser.fazer_txt_do_historico(id)
