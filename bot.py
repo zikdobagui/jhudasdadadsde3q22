@@ -41,6 +41,24 @@ from datetime import timezone
 from pytz import timezone
 from database import get_user_balance, add_saldo, add_pagamento, get_top_users
 
+GLOBAL_PREMIUM_EMOJI_IDS = {
+    "🎁": "5350486389806868244",
+    "👑": "5370784581341422520",
+    "💰": "5456140674028019486",
+    "💳": "5456140674028019486",
+    "🛒": "5229064374403998351",
+    "🛍️": "5229064374403998351",
+    "📦": "5231200819986047254",
+    "🔎": "5210956306952758910",
+    "🔍": "5210956306952758910",
+    "✅": "5350486389806868244",
+    "⚠️": "5447644880824181073",
+    "🌐": "5447410659077661506",
+    "⭐": "5370784581341422520",
+    "🔮": "5350693961281314631",
+    "🧩": "5350486389806868244",
+}
+
 def service_callback_token(servico):
     return hashlib.sha1(str(servico).strip().casefold().encode('utf-8')).hexdigest()[:16]
 
@@ -73,6 +91,11 @@ def _patched_button_to_dict(self):
     if isinstance(text, str):
         if 'fix_mojibake_text' in globals():
             text = fix_mojibake_text(text)
+        if not getattr(self, 'icon_custom_emoji_id', None):
+            for fallback, emoji_id in GLOBAL_PREMIUM_EMOJI_IDS.items():
+                if text.startswith(fallback):
+                    self.icon_custom_emoji_id = emoji_id
+                    break
         color_match = re.search(
             r'(?:\[|\{)\s*(?:cor|color|style)\s*:\s*([a-zA-Z_ -]+)\s*(?:\]|\})|<\s*(?:cor|color|style)\s*=\s*["\']?([a-zA-Z_ -]+)["\']?\s*>',
             text,
@@ -471,6 +494,29 @@ def custom_emoji(emoji_id: str, fallback: str) -> str:
     if not re.fullmatch(r'\d+', emoji_id):
         return fallback
     return f'<tg-emoji emoji-id="{html.escape(emoji_id)}">{html.escape(str(fallback))}</tg-emoji>'
+
+def aplicar_emojis_premium_globais(text: str) -> str:
+    if not isinstance(text, str) or not text:
+        return text
+
+    placeholders = {}
+
+    def keep_existing(match):
+        key = f"__TG_EMOJI_{len(placeholders)}__"
+        placeholders[key] = match.group(0)
+        return key
+
+    result = re.sub(
+        r'<tg-emoji\s+emoji-id=["\'][^"\']+["\']\s*>.*?</tg-emoji>',
+        keep_existing,
+        text,
+        flags=re.IGNORECASE | re.DOTALL
+    )
+    for fallback, emoji_id in sorted(GLOBAL_PREMIUM_EMOJI_IDS.items(), key=lambda item: len(item[0]), reverse=True):
+        result = result.replace(fallback, custom_emoji(emoji_id, fallback))
+    for key, value in placeholders.items():
+        result = result.replace(key, value)
+    return result
 
 def strip_tg_emoji_tags(text: str) -> str:
     return re.sub(
@@ -1163,11 +1209,21 @@ _original_bot_edit_message_text = bot.edit_message_text
 _original_bot_edit_message_caption = bot.edit_message_caption
 _original_bot_answer_callback_query = bot.answer_callback_query
 
+def _html_parse_enabled(kwargs):
+    return str(kwargs.get('parse_mode', '')).upper() == 'HTML'
+
+def _sanitize_outgoing_text(text, use_premium=False):
+    text = fix_mojibake_text(text)
+    if use_premium:
+        text = aplicar_emojis_premium_globais(text)
+    return text
+
 def _sanitize_text_kwargs(kwargs, *names):
     sanitized = dict(kwargs)
+    use_premium = _html_parse_enabled(sanitized)
     for name in names:
         if name in sanitized:
-            sanitized[name] = fix_mojibake_text(sanitized[name])
+            sanitized[name] = _sanitize_outgoing_text(sanitized[name], use_premium)
     return sanitized
 
 def _ignore_message_not_modified(error):
@@ -1184,7 +1240,7 @@ def _ignore_expired_callback_query(error):
 def _safe_bot_edit_message_text(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'text')
     if args:
-        args = (fix_mojibake_text(args[0]), *args[1:])
+        args = (_sanitize_outgoing_text(args[0], _html_parse_enabled(kwargs)), *args[1:])
     try:
         return _original_bot_edit_message_text(*args, **kwargs)
     except ApiTelegramException as error:
@@ -1195,7 +1251,7 @@ def _safe_bot_edit_message_text(*args, **kwargs):
 def _safe_bot_edit_message_caption(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'caption')
     if args:
-        args = (fix_mojibake_text(args[0]), *args[1:])
+        args = (_sanitize_outgoing_text(args[0], _html_parse_enabled(kwargs)), *args[1:])
     try:
         return _original_bot_edit_message_caption(*args, **kwargs)
     except ApiTelegramException as error:
@@ -1206,7 +1262,7 @@ def _safe_bot_edit_message_caption(*args, **kwargs):
 def _safe_bot_send_message(*args, **kwargs):
     kwargs = _sanitize_text_kwargs(kwargs, 'text')
     if len(args) >= 2:
-        args = (args[0], fix_mojibake_text(args[1]), *args[2:])
+        args = (args[0], _sanitize_outgoing_text(args[1], _html_parse_enabled(kwargs)), *args[2:])
     return _original_bot_send_message(*args, **kwargs)
 
 def _safe_bot_send_photo(*args, **kwargs):
