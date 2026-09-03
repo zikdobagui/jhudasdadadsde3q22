@@ -4910,6 +4910,57 @@ def mostrar_clube_vip(call):
         reply_markup=markup
     )
 
+def mostrar_integracao_api(call):
+    user_id = call.from_user.id
+    saldo = float(api.InfoUser.saldo(user_id))
+    minimo = float(api.IntegracaoAPI.saldo_minimo())
+    chave = api.IntegracaoAPI.chave_ativa(user_id)
+    liberado = saldo >= minimo
+    api_url = MINIAPP_URL.rstrip('/')
+
+    if chave:
+        chave_txt = f"<code>{html.escape(chave)}</code>"
+        botao_chave = InlineKeyboardButton('🔄 Gerar nova chave', callback_data='api_publica_gerar')
+        botao_revogar = InlineKeyboardButton('🛑 Revogar chave', callback_data='api_publica_revogar')
+    else:
+        chave_txt = "<i>nenhuma chave ativa</i>"
+        botao_chave = InlineKeyboardButton('🚀 Liberar / gerar chave', callback_data='api_publica_gerar')
+        botao_revogar = None
+
+    texto = (
+        "🌐 <b>API DE REVENDA PRO SEU SITE</b>\n\n"
+        "Venda os produtos direto no seu site ou sistema. Seu site chama nossa API, "
+        "o estoque é reservado na hora e o custo-base é descontado do seu saldo no bot raiz.\n\n"
+        "⚙️ <b>Como funciona</b>\n"
+        "• Modelo pré-pago: mantenha crédito aqui no bot.\n"
+        "• Cada venda desconta só o valor base do produto.\n"
+        "• A sua margem/lucro você define no seu site.\n"
+        "• Endpoints prontos para listar produtos e comprar.\n\n"
+        f"💰 Saldo atual: <code>R${saldo:.2f}</code>\n"
+        f"🔓 Saldo mínimo para liberar: <code>R${minimo:.2f}</code>\n"
+        f"🔑 Sua chave: {chave_txt}\n\n"
+        "<b>Listar produtos</b>\n"
+        f"<code>GET {api_url}/api/stock</code>\n"
+        "Header: <code>X-Stock-Key: SUA_CHAVE</code>\n\n"
+        "<b>Comprar/reservar login</b>\n"
+        f"<code>POST {api_url}/api/stock/reserve</code>\n"
+        "Body: <code>{\"service\":\"NOME_DO_PRODUTO\",\"buyer_id\":\"123\",\"sale_id\":\"pedido-1\"}</code>\n\n"
+        "<b>Retorno da compra</b>\n"
+        "<code>{\"access\":{\"nome\":\"...\",\"valor\":10,\"email\":\"...\",\"senha\":\"...\"}}</code>"
+    )
+    if not liberado:
+        texto += f"\n\n⚠️ Para gerar a chave, adicione pelo menos R${minimo:.2f} de saldo."
+
+    markup = InlineKeyboardMarkup()
+    if liberado:
+        markup.row(botao_chave)
+    if botao_revogar:
+        markup.row(botao_revogar)
+    markup.row(InlineKeyboardButton('💰 Adicionar saldo', callback_data='addsaldo'))
+    markup.row(InlineKeyboardButton(api.Botoes.voltar(), callback_data='perfil'))
+
+    bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
 def mostrar_admin_vip(message):
     if not _admin_only(message):
         bot.reply_to(message, 'â€¢ Sem permissÃ£o.')
@@ -7055,6 +7106,7 @@ def perfil(call):
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
     markup.add(InlineKeyboardButton(botao_personalizado('clube_vip', '👑 CLUBE VIP'), callback_data='clube_vip'))
+    markup.add(InlineKeyboardButton('🌐 Integração API', callback_data='api_publica'))
     markup.add(InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
@@ -7096,6 +7148,38 @@ def enviar_menu_inicial(message):
         text=texto,
         reply_markup=markup
     )
+
+@bot.message_handler(commands=['api_minimo'])
+def configurar_api_publica_minimo(message):
+    if not is_owner_or_admin(message.from_user.id):
+        bot.reply_to(message, '• Sem permissão.')
+        return
+    partes = (message.text or '').split(maxsplit=1)
+    if len(partes) < 2:
+        bot.reply_to(message, f"Uso: <code>/api_minimo 50</code>\nAtual: R${api.IntegracaoAPI.saldo_minimo():.2f}", parse_mode='HTML')
+        return
+    try:
+        valor = float(partes[1].replace(',', '.'))
+    except ValueError:
+        bot.reply_to(message, 'Valor inválido. Exemplo: <code>/api_minimo 50</code>', parse_mode='HTML')
+        return
+    api.IntegracaoAPI.mudar_saldo_minimo(valor)
+    bot.reply_to(message, f"Saldo mínimo da integração alterado para R${valor:.2f}.")
+
+@bot.message_handler(commands=['revogar_api'])
+def admin_revogar_api_publica(message):
+    if not is_owner_or_admin(message.from_user.id):
+        bot.reply_to(message, '• Sem permissão.')
+        return
+    partes = (message.text or '').split(maxsplit=1)
+    if len(partes) < 2:
+        bot.reply_to(message, 'Uso: <code>/revogar_api ID_DO_USUARIO</code>', parse_mode='HTML')
+        return
+    user_id = partes[1].strip()
+    if not api.IntegracaoAPI.revogar_chave(user_id):
+        bot.reply_to(message, 'Usuário não encontrado.')
+        return
+    bot.reply_to(message, f"Chave API do usuário <code>{html.escape(user_id)}</code> revogada.", parse_mode='HTML')
 
 
 @bot.callback_query_handler(func=lambda c: c.data == 'menu_start')
@@ -8776,6 +8860,31 @@ def callback_query(call):
         except Exception:
             pass
         enviar_menu_inicial(call.message)
+        return
+
+    if call.data == 'api_publica':
+        bot.answer_callback_query(call.id)
+        mostrar_integracao_api(call)
+        return
+
+    if call.data == 'api_publica_gerar':
+        saldo = float(api.InfoUser.saldo(call.from_user.id))
+        minimo = float(api.IntegracaoAPI.saldo_minimo())
+        if saldo < minimo:
+            bot.answer_callback_query(call.id, f"Adicione pelo menos R${minimo:.2f} para liberar.", show_alert=True)
+            return
+        chave = api.IntegracaoAPI.gerar_chave(call.from_user.id)
+        if not chave:
+            bot.answer_callback_query(call.id, "Nao encontrei seu cadastro. Envie /start e tente de novo.", show_alert=True)
+            return
+        bot.answer_callback_query(call.id, "Chave gerada com sucesso.", show_alert=True)
+        mostrar_integracao_api(call)
+        return
+
+    if call.data == 'api_publica_revogar':
+        api.IntegracaoAPI.revogar_chave(call.from_user.id)
+        bot.answer_callback_query(call.id, "Chave revogada.", show_alert=True)
+        mostrar_integracao_api(call)
         return
 
     if call.data == 'aceitar_termos_compra':

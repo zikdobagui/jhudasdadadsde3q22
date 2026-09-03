@@ -65,6 +65,31 @@ def _stock_api_key():
     return str(_load_credentials().get('stock_api_key', '')).strip()
 
 
+def _find_public_api_owner(received_key):
+    received_key = str(received_key or '').strip()
+    if not received_key:
+        return None
+    users_dir = os.path.join(BASE_DIR, 'database', 'users')
+    if not os.path.isdir(users_dir):
+        return None
+    for filename in os.listdir(users_dir):
+        if not filename.endswith('.json'):
+            continue
+        user_id = filename[:-5]
+        try:
+            user_data = database.load_user_data(user_id)
+        except Exception:
+            continue
+        credencial = user_data.get('api_publica', {}) if isinstance(user_data, dict) else {}
+        if (
+            isinstance(credencial, dict)
+            and credencial.get('active') is True
+            and str(credencial.get('key', '')).strip() == received_key
+        ):
+            return str(user_data.get('id', user_id))
+    return None
+
+
 def _save_acessos(data):
     os.makedirs(os.path.dirname(ACESSOS_FILE), exist_ok=True)
     fd, temp_path = tempfile.mkstemp(prefix='acessos-', suffix='.json', dir=os.path.dirname(ACESSOS_FILE))
@@ -260,7 +285,8 @@ class Handler(SimpleHTTPRequestHandler):
             self._responder_json(404, {'error': 'not_found'})
             return
 
-        if not self._autorizado():
+        auth = self._autorizado()
+        if not auth:
             self._responder_json(401, {'error': 'unauthorized'})
             return
 
@@ -270,18 +296,23 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == '/api/stock/reserve':
+            public_owner_id = auth if auth != 'global' else ''
             ok, reason, acesso = reservar_primeiro_acesso(
                 payload.get('service'),
                 payload.get('child_bot_id', ''),
                 payload.get('buyer_id', ''),
                 payload.get('sale_id', ''),
-                payload.get('reseller_admin_id', ''),
+                public_owner_id or payload.get('reseller_admin_id', ''),
             )
             if not ok:
                 status = 404 if reason == 'out_of_stock' else 402
                 self._responder_json(status, {'error': reason, 'details': acesso or {}})
                 return
             self._responder_json(200, {'access': acesso})
+            return
+
+        if auth != 'global':
+            self._responder_json(403, {'error': 'admin_key_required'})
             return
 
         ok, resultado = adicionar_acesso(payload)
@@ -293,7 +324,9 @@ class Handler(SimpleHTTPRequestHandler):
     def _autorizado(self):
         expected_key = _stock_api_key()
         received_key = self.headers.get('X-Stock-Key', '')
-        return bool(expected_key) and received_key == expected_key
+        if bool(expected_key) and received_key == expected_key:
+            return 'global'
+        return _find_public_api_owner(received_key)
 
     def _ler_json(self):
         try:

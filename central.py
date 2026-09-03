@@ -10,6 +10,7 @@ import pytz
 import os
 import threading
 import requests
+import secrets
 from datetime import timezone
 from database import load_user_data, save_user_data
 from pytz import timezone
@@ -24,6 +25,10 @@ DEFAULT_DATABASE_FILES = {
     'database/price_overrides.json': {"prices": {}},
     'database/reserve_verified.json': {},
     'database/users.json': {"users": []},
+}
+
+DEFAULT_CREDENTIAL_VALUES = {
+    "api_publica_saldo_minimo": 50,
 }
 
 VIP_CONFIG_PATH = 'settings/vip.json'
@@ -96,6 +101,68 @@ def open_utf8(filepath, mode='r'):
         ensure_default_database_file(filepath)
         ensure_default_text_file(filepath)
     return open(filepath, mode, encoding='utf-8')
+
+def _load_credentials_data():
+    with open_utf8('settings/credenciais.json', 'r') as f:
+        data = json.load(f)
+    changed = False
+    for key, value in DEFAULT_CREDENTIAL_VALUES.items():
+        if key not in data:
+            data[key] = value
+            changed = True
+    if changed:
+        with open_utf8('settings/credenciais.json', 'w') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    return data
+
+def _save_credentials_data(data):
+    with open_utf8('settings/credenciais.json', 'w') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+class IntegracaoAPI():
+    def saldo_minimo():
+        data = _load_credentials_data()
+        return float(data.get("api_publica_saldo_minimo", 50) or 0)
+
+    def mudar_saldo_minimo(valor):
+        data = _load_credentials_data()
+        data["api_publica_saldo_minimo"] = float(valor)
+        _save_credentials_data(data)
+
+    def gerar_chave(id):
+        user_data = load_user_data(id)
+        if not user_data:
+            return None
+        credencial = user_data.setdefault("api_publica", {})
+        credencial["key"] = "rk_" + secrets.token_urlsafe(32)
+        credencial["active"] = True
+        credencial["created_at"] = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        credencial["revoked_at"] = ""
+        save_user_data(id, user_data)
+        return credencial["key"]
+
+    def dados(id):
+        user_data = load_user_data(id)
+        if not user_data:
+            return {}
+        credencial = user_data.get("api_publica", {})
+        return credencial if isinstance(credencial, dict) else {}
+
+    def chave_ativa(id):
+        credencial = IntegracaoAPI.dados(id)
+        if not credencial.get("active"):
+            return ""
+        return str(credencial.get("key", "")).strip()
+
+    def revogar_chave(id):
+        user_data = load_user_data(id)
+        if not user_data:
+            return False
+        credencial = user_data.setdefault("api_publica", {})
+        credencial["active"] = False
+        credencial["revoked_at"] = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        save_user_data(id, user_data)
+        return True
 
 class ViewTime():
     def data_atual():

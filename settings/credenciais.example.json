@@ -18,6 +18,7 @@
   "child_bot_id": "",
   "reseller_admin_id": "",
   "reseller_billing_enabled": true,
+  "api_publica_saldo_minimo": 50,
   "sale_price_markup_percent": 0,
   "token_mp": "COLOQUE_O_TOKEN_DO_MERCADO_PAGO",
   "separador": "/",
