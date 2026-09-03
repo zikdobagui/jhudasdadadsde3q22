@@ -4918,12 +4918,12 @@ def mostrar_integracao_api(call):
     liberado = saldo >= minimo
     api_url = MINIAPP_URL.rstrip('/')
     globe = custom_emoji("5447410659077661506", "🌐")
-    gear = custom_emoji("5228963275738914121", "⚙️")
-    money = custom_emoji("5228963275738914121", "💰")
-    key = custom_emoji("5228963275738914121", "🔑")
-    rocket = custom_emoji("5228963275738914121", "🚀")
+    gear = custom_emoji("5350486389806868244", "⚙️")
+    money = custom_emoji("5370784581341422520", "💰")
+    key = custom_emoji("5350486389806868244", "🔑")
+    rocket = custom_emoji("5370784581341422520", "🚀")
     warning = custom_emoji("5447644880824181073", "⚠️")
-    lock = custom_emoji("5447644880824181073", "🔓")
+    lock = custom_emoji("5350486389806868244", "🔓")
     cart = custom_emoji("5229064374403998351", "🛒")
     doc = custom_emoji("5210956306952758910", "📋")
     header_example = html.escape(f"X-Stock-Key: SUA_CHAVE")
@@ -8894,7 +8894,7 @@ def callback_query(call):
         bot.send_message(
             call.message.chat.id,
             (
-                f"{custom_emoji('5228963275738914121', '🔑')} <b>Sua chave API foi gerada.</b>\n\n"
+                f"{custom_emoji('5350486389806868244', '🔑')} <b>Sua chave API foi gerada.</b>\n\n"
                 f"<code>{html.escape(chave)}</code>\n\n"
                 "Guarde essa chave agora. Por segurança, depois ela será mostrada só pelo final."
             ),
