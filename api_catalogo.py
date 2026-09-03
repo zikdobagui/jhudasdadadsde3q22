@@ -13,6 +13,8 @@ NÃO expõe email/senha — só nome, preço, estoque e imagem.
 
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse
+from collections import defaultdict, deque
+import hmac
 import json
 import os
 import sys
@@ -20,6 +22,8 @@ import traceback
 import mimetypes
 import tempfile
 import threading
+import time
+import hashlib
 
 import database
 
@@ -31,6 +35,22 @@ ACESSOS_FILE = os.path.join(BASE_DIR, 'database', 'acessos.json')
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 CREDENTIALS_FILE = os.path.join(BASE_DIR, 'settings', 'credenciais.json')
 stock_lock = threading.Lock()
+rate_lock = threading.Lock()
+request_log = defaultdict(deque)
+
+MAX_BODY_BYTES = 16 * 1024
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_REQUESTS = 120
+RATE_LIMIT_MAX_RESERVES = 30
+MAX_FIELD_LENGTH = 200
+MAX_SECRET_FIELD_LENGTH = 2000
+SECURITY_HEADERS = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.telegram.org https://t.me",
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+}
 
 
 def _reseller_billing_enabled():
@@ -65,6 +85,16 @@ def _stock_api_key():
     return str(_load_credentials().get('stock_api_key', '')).strip()
 
 
+def _same_secret(left, right):
+    left = str(left or '').strip()
+    right = str(right or '').strip()
+    return bool(left) and hmac.compare_digest(left, right)
+
+
+def _sha256(text):
+    return hashlib.sha256(str(text or '').encode('utf-8')).hexdigest()
+
+
 def _find_public_api_owner(received_key):
     received_key = str(received_key or '').strip()
     if not received_key:
@@ -81,13 +111,49 @@ def _find_public_api_owner(received_key):
         except Exception:
             continue
         credencial = user_data.get('api_publica', {}) if isinstance(user_data, dict) else {}
-        if (
-            isinstance(credencial, dict)
-            and credencial.get('active') is True
-            and str(credencial.get('key', '')).strip() == received_key
-        ):
+        if not isinstance(credencial, dict) or credencial.get('active') is not True:
+            continue
+        stored_hash = str(credencial.get('key_hash', '')).strip()
+        if stored_hash and _same_secret(stored_hash, _sha256(received_key)):
+            return str(user_data.get('id', user_id))
+        if _same_secret(credencial.get('key', ''), received_key):
             return str(user_data.get('id', user_id))
     return None
+
+
+def _client_ip(handler):
+    forwarded = handler.headers.get('X-Forwarded-For', '')
+    if forwarded:
+        return forwarded.split(',', 1)[0].strip()
+    return handler.client_address[0] if handler.client_address else 'unknown'
+
+
+def _rate_limited(identity, bucket='default', limit=RATE_LIMIT_MAX_REQUESTS):
+    now = time.time()
+    key = f'{bucket}:{identity}'
+    with rate_lock:
+        events = request_log[key]
+        while events and now - events[0] > RATE_LIMIT_WINDOW_SECONDS:
+            events.popleft()
+        if len(events) >= limit:
+            return True
+        events.append(now)
+    return False
+
+
+def _clean_text(value, max_length=MAX_FIELD_LENGTH):
+    text = str(value or '').strip()
+    if len(text) > max_length:
+        text = text[:max_length]
+    return text.replace('\x00', '')
+
+
+def _public_error(reason):
+    if reason == 'out_of_stock':
+        return 404, {'error': reason}
+    if reason == 'insufficient_reseller_balance':
+        return 402, {'error': reason}
+    return 400, {'error': reason}
 
 
 def _save_acessos(data):
@@ -165,7 +231,12 @@ def gerar_catalogo():
 
 
 def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id='', reseller_admin_id=''):
-    servico_key = str(servico or '').strip().casefold()
+    servico = _clean_text(servico)
+    child_bot_id = _clean_text(child_bot_id)
+    buyer_id = _clean_text(buyer_id)
+    sale_id = _clean_text(sale_id)
+    reseller_admin_id = _clean_text(reseller_admin_id, 32)
+    servico_key = servico.casefold()
     if not servico_key:
         return False, 'invalid_service', None
 
@@ -176,8 +247,6 @@ def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id='', 
         for index, acesso in enumerate(acessos):
             if str(acesso.get('nome', '')).strip().casefold() == servico_key:
                 valor = float(acesso.get('valor', 0) or 0)
-                reseller_admin_id = str(reseller_admin_id or '').strip()
-
                 if _reseller_billing_enabled():
                     if not reseller_admin_id:
                         return False, 'missing_reseller_admin_id', None
@@ -224,18 +293,20 @@ def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id='', 
 
 
 def adicionar_acesso(payload):
+    if not isinstance(payload, dict):
+        return False, 'Payload invalido'
     obrigatorios = ('nome', 'valor', 'email', 'senha')
     faltando = [campo for campo in obrigatorios if not str(payload.get(campo, '')).strip()]
     if faltando:
         return False, f"Campos obrigatórios faltando: {', '.join(faltando)}"
 
     item = {
-        'nome': payload.get('nome', ''),
+        'nome': _clean_text(payload.get('nome', '')),
         'valor': payload.get('valor', 0),
-        'descricao': payload.get('descricao', ''),
-        'email': payload.get('email', ''),
-        'senha': payload.get('senha', ''),
-        'duracao': payload.get('duracao', ''),
+        'descricao': _clean_text(payload.get('descricao', ''), MAX_SECRET_FIELD_LENGTH),
+        'email': _clean_text(payload.get('email', ''), MAX_SECRET_FIELD_LENGTH),
+        'senha': _clean_text(payload.get('senha', ''), MAX_SECRET_FIELD_LENGTH),
+        'duracao': _clean_text(payload.get('duracao', '')),
     }
 
     with stock_lock:
@@ -254,6 +325,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if _rate_limited(_client_ip(self), 'get'):
+            self._responder_json(429, {'error': 'rate_limited'})
+            return
 
         if path in ('/catalog', '/catalog.json'):
             self._responder_catalogo()
@@ -280,6 +354,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+        if _rate_limited(_client_ip(self), 'post'):
+            self._responder_json(429, {'error': 'rate_limited'})
+            return
 
         if path not in ('/api/stock/reserve', '/api/stock/add'):
             self._responder_json(404, {'error': 'not_found'})
@@ -297,6 +374,10 @@ class Handler(SimpleHTTPRequestHandler):
 
         if path == '/api/stock/reserve':
             public_owner_id = auth if auth != 'global' else ''
+            rate_identity = public_owner_id or _client_ip(self)
+            if _rate_limited(rate_identity, 'reserve', RATE_LIMIT_MAX_RESERVES):
+                self._responder_json(429, {'error': 'rate_limited'})
+                return
             ok, reason, acesso = reservar_primeiro_acesso(
                 payload.get('service'),
                 payload.get('child_bot_id', ''),
@@ -305,8 +386,8 @@ class Handler(SimpleHTTPRequestHandler):
                 public_owner_id or payload.get('reseller_admin_id', ''),
             )
             if not ok:
-                status = 404 if reason == 'out_of_stock' else 402
-                self._responder_json(status, {'error': reason, 'details': acesso or {}})
+                status, payload = _public_error(reason)
+                self._responder_json(status, payload)
                 return
             self._responder_json(200, {'access': acesso})
             return
@@ -324,13 +405,15 @@ class Handler(SimpleHTTPRequestHandler):
     def _autorizado(self):
         expected_key = _stock_api_key()
         received_key = self.headers.get('X-Stock-Key', '')
-        if bool(expected_key) and received_key == expected_key:
+        if _same_secret(expected_key, received_key):
             return 'global'
         return _find_public_api_owner(received_key)
 
     def _ler_json(self):
         try:
             length = int(self.headers.get('Content-Length', '0'))
+            if length <= 0 or length > MAX_BODY_BYTES:
+                return None
             raw = self.rfile.read(length)
             return json.loads(raw.decode('utf-8') or '{}')
         except Exception:
@@ -344,6 +427,18 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def end_headers(self):
+        self._send_security_headers()
+        super().end_headers()
+
+    def _send_security_headers(self):
+        for header, value in SECURITY_HEADERS.items():
+            self.send_header(header, value)
+
+    def list_directory(self, path):
+        self.send_error(403, 'Directory listing disabled')
+        return None
 
     def _responder_catalogo(self):
         try:

@@ -11,6 +11,7 @@ import os
 import threading
 import requests
 import secrets
+import hashlib
 from datetime import timezone
 from database import load_user_data, save_user_data
 from pytz import timezone
@@ -133,13 +134,16 @@ class IntegracaoAPI():
         user_data = load_user_data(id)
         if not user_data:
             return None
+        nova_chave = "rk_" + secrets.token_urlsafe(32)
         credencial = user_data.setdefault("api_publica", {})
-        credencial["key"] = "rk_" + secrets.token_urlsafe(32)
+        credencial.pop("key", None)
+        credencial["key_hash"] = hashlib.sha256(nova_chave.encode("utf-8")).hexdigest()
+        credencial["key_last4"] = nova_chave[-4:]
         credencial["active"] = True
         credencial["created_at"] = datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')
         credencial["revoked_at"] = ""
         save_user_data(id, user_data)
-        return credencial["key"]
+        return nova_chave
 
     def dados(id):
         user_data = load_user_data(id)
@@ -153,6 +157,18 @@ class IntegracaoAPI():
         if not credencial.get("active"):
             return ""
         return str(credencial.get("key", "")).strip()
+
+    def resumo_chave(id):
+        credencial = IntegracaoAPI.dados(id)
+        if not credencial.get("active"):
+            return ""
+        last4 = str(credencial.get("key_last4", "")).strip()
+        if last4:
+            return f"ativa terminando em {last4}"
+        chave_legada = str(credencial.get("key", "")).strip()
+        if chave_legada:
+            return f"ativa terminando em {chave_legada[-4:]}"
+        return "ativa"
 
     def revogar_chave(id):
         user_data = load_user_data(id)

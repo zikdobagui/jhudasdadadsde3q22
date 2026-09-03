@@ -4,6 +4,7 @@ __pycache__/
 *.log
 sync_log.txt*
 log/
+*.zip
 
 .env
 .env.*
@@ -24,5 +25,8 @@ database/*.sqlite3
 database/users/
 database/roleta_giros.json
 database/login_registry.json
+bot_pai/config.json
+bot_pai/data/
+bot_pai/runtime/
 
 qrcode*.png

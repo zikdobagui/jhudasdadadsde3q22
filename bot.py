@@ -4914,12 +4914,12 @@ def mostrar_integracao_api(call):
     user_id = call.from_user.id
     saldo = float(api.InfoUser.saldo(user_id))
     minimo = float(api.IntegracaoAPI.saldo_minimo())
-    chave = api.IntegracaoAPI.chave_ativa(user_id)
+    chave_resumo = api.IntegracaoAPI.resumo_chave(user_id)
     liberado = saldo >= minimo
     api_url = MINIAPP_URL.rstrip('/')
 
-    if chave:
-        chave_txt = f"<code>{html.escape(chave)}</code>"
+    if chave_resumo:
+        chave_txt = f"<code>{html.escape(chave_resumo)}</code>"
         botao_chave = InlineKeyboardButton('🔄 Gerar nova chave', callback_data='api_publica_gerar')
         botao_revogar = InlineKeyboardButton('🛑 Revogar chave', callback_data='api_publica_revogar')
     else:
@@ -8878,6 +8878,15 @@ def callback_query(call):
             bot.answer_callback_query(call.id, "Nao encontrei seu cadastro. Envie /start e tente de novo.", show_alert=True)
             return
         bot.answer_callback_query(call.id, "Chave gerada com sucesso.", show_alert=True)
+        bot.send_message(
+            call.message.chat.id,
+            (
+                "🔑 <b>Sua chave API foi gerada.</b>\n\n"
+                f"<code>{html.escape(chave)}</code>\n\n"
+                "Guarde essa chave agora. Por segurança, depois ela será mostrada só pelo final."
+            ),
+            parse_mode='HTML'
+        )
         mostrar_integracao_api(call)
         return
 
