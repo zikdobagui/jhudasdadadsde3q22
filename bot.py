@@ -4917,46 +4917,59 @@ def mostrar_integracao_api(call):
     chave_resumo = api.IntegracaoAPI.resumo_chave(user_id)
     liberado = saldo >= minimo
     api_url = MINIAPP_URL.rstrip('/')
+    globe = custom_emoji("5447410659077661506", "🌐")
+    gear = custom_emoji("5228963275738914121", "⚙️")
+    money = custom_emoji("5228963275738914121", "💰")
+    key = custom_emoji("5228963275738914121", "🔑")
+    rocket = custom_emoji("5228963275738914121", "🚀")
+    warning = custom_emoji("5447644880824181073", "⚠️")
+    lock = custom_emoji("5447644880824181073", "🔓")
+    cart = custom_emoji("5229064374403998351", "🛒")
+    doc = custom_emoji("5210956306952758910", "📋")
+    header_example = html.escape(f"X-Stock-Key: SUA_CHAVE")
+    reserve_body = html.escape('{"service":"NOME_DO_PRODUTO","buyer_id":"123","sale_id":"pedido-1"}')
+    reserve_response = html.escape('{"access":{"nome":"...","valor":10,"email":"...","senha":"..."}}')
 
     if chave_resumo:
         chave_txt = f"<code>{html.escape(chave_resumo)}</code>"
-        botao_chave = InlineKeyboardButton('🔄 Gerar nova chave', callback_data='api_publica_gerar')
-        botao_revogar = InlineKeyboardButton('🛑 Revogar chave', callback_data='api_publica_revogar')
+        botao_chave = InlineKeyboardButton(f'{rocket} Gerar nova chave', callback_data='api_publica_gerar')
+        botao_revogar = InlineKeyboardButton(f'{warning} Revogar chave', callback_data='api_publica_revogar')
     else:
         chave_txt = "<i>nenhuma chave ativa</i>"
-        botao_chave = InlineKeyboardButton('🚀 Liberar / gerar chave', callback_data='api_publica_gerar')
+        botao_chave = InlineKeyboardButton(f'{rocket} Liberar / gerar chave', callback_data='api_publica_gerar')
         botao_revogar = None
 
     texto = (
-        "🌐 <b>API DE REVENDA PRO SEU SITE</b>\n\n"
-        "Venda os produtos direto no seu site ou sistema. Seu site chama nossa API, "
-        "o estoque é reservado na hora e o custo-base é descontado do seu saldo no bot raiz.\n\n"
-        "⚙️ <b>Como funciona</b>\n"
-        "• Modelo pré-pago: mantenha crédito aqui no bot.\n"
-        "• Cada venda desconta só o valor base do produto.\n"
-        "• A sua margem/lucro você define no seu site.\n"
-        "• Endpoints prontos para listar produtos e comprar.\n\n"
-        f"💰 Saldo atual: <code>R${saldo:.2f}</code>\n"
-        f"🔓 Saldo mínimo para liberar: <code>R${minimo:.2f}</code>\n"
-        f"🔑 Sua chave: {chave_txt}\n\n"
-        "<b>Listar produtos</b>\n"
-        f"<code>GET {api_url}/api/stock</code>\n"
-        "Header: <code>X-Stock-Key: SUA_CHAVE</code>\n\n"
-        "<b>Comprar/reservar login</b>\n"
-        f"<code>POST {api_url}/api/stock/reserve</code>\n"
-        "Body: <code>{\"service\":\"NOME_DO_PRODUTO\",\"buyer_id\":\"123\",\"sale_id\":\"pedido-1\"}</code>\n\n"
+        f"{globe} <b>API DE REVENDA PRO SEU SITE</b>\n\n"
+        "Venda no seu site ou sistema usando nosso estoque em tempo real. "
+        "Quando a venda confirma, a API reserva o login e desconta o custo-base do seu saldo no bot raiz.\n\n"
+        f"{gear} <b>Como funciona</b>\n"
+        "• Você mantém saldo pré-pago aqui no bot.\n"
+        "• Seu site define o preço final e sua margem.\n"
+        "• A API entrega o acesso somente depois de validar saldo e estoque.\n\n"
+        f"{money} Saldo atual: <code>R${saldo:.2f}</code>\n"
+        f"{lock} Saldo mínimo para liberar: <code>R${minimo:.2f}</code>\n"
+        f"{key} Sua chave: {chave_txt}\n\n"
+        f"{doc} <b>Listar produtos</b>\n"
+        f"<pre>GET {api_url}/api/stock</pre>\n"
+        "<b>Header</b>\n"
+        f"<pre>{header_example}</pre>\n\n"
+        f"{cart} <b>Comprar/reservar login</b>\n"
+        f"<pre>POST {api_url}/api/stock/reserve</pre>\n"
+        "<b>Body JSON</b>\n"
+        f"<pre><code class=\"language-json\">{reserve_body}</code></pre>\n\n"
         "<b>Retorno da compra</b>\n"
-        "<code>{\"access\":{\"nome\":\"...\",\"valor\":10,\"email\":\"...\",\"senha\":\"...\"}}</code>"
+        f"<pre><code class=\"language-json\">{reserve_response}</code></pre>"
     )
     if not liberado:
-        texto += f"\n\n⚠️ Para gerar a chave, adicione pelo menos R${minimo:.2f} de saldo."
+        texto += f"\n\n{warning} Para gerar a chave, adicione pelo menos R${minimo:.2f} de saldo."
 
     markup = InlineKeyboardMarkup()
     if liberado:
         markup.row(botao_chave)
     if botao_revogar:
         markup.row(botao_revogar)
-    markup.row(InlineKeyboardButton('💰 Adicionar saldo', callback_data='addsaldo'))
+    markup.row(InlineKeyboardButton(f'{money} Adicionar saldo', callback_data='addsaldo'))
     markup.row(InlineKeyboardButton(api.Botoes.voltar(), callback_data='perfil'))
 
     bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
@@ -7106,7 +7119,7 @@ def perfil(call):
     bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
     markup.add(bt)
     markup.add(InlineKeyboardButton(botao_personalizado('clube_vip', '👑 CLUBE VIP'), callback_data='clube_vip'))
-    markup.add(InlineKeyboardButton('🌐 Integração API', callback_data='api_publica'))
+    markup.add(InlineKeyboardButton(f'{custom_emoji("5447410659077661506", "🌐")} Integração API', callback_data='api_publica'))
     markup.add(InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe'))
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
@@ -8881,7 +8894,7 @@ def callback_query(call):
         bot.send_message(
             call.message.chat.id,
             (
-                "🔑 <b>Sua chave API foi gerada.</b>\n\n"
+                f"{custom_emoji('5228963275738914121', '🔑')} <b>Sua chave API foi gerada.</b>\n\n"
                 f"<code>{html.escape(chave)}</code>\n\n"
                 "Guarde essa chave agora. Por segurança, depois ela será mostrada só pelo final."
             ),
