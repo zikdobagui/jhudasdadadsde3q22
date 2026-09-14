@@ -1,7 +1,7 @@
 import json
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from textwrap import dedent
 
 import telebot
@@ -139,12 +139,28 @@ def trial_admin_markup(trial):
         markup.add(types.InlineKeyboardButton("Desligar", callback_data=f"trial:stop:{trial_id}"))
     elif parse_datetime(trial["expires_at"]) > datetime.now():
         markup.add(types.InlineKeyboardButton("Ligar", callback_data=f"trial:start:{trial_id}"))
+    else:
+        markup.add(types.InlineKeyboardButton("Reativar", callback_data=f"trial:reactivate:{trial_id}"))
     markup.add(
         types.InlineKeyboardButton("Excluir", callback_data=f"trial:confirm_delete:{trial_id}"),
         types.InlineKeyboardButton("Atualizar", callback_data=f"trial:view:{trial_id}"),
     )
     markup.add(types.InlineKeyboardButton("Bots", callback_data="menu:bots"))
     markup.add(types.InlineKeyboardButton("Menu", callback_data="menu:home"))
+    return markup
+
+
+def trial_reactivate_markup(trial_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("1 hora", callback_data=f"trial:renew_1h:{trial_id}"),
+        types.InlineKeyboardButton("1 dia", callback_data=f"trial:renew_1d:{trial_id}"),
+    )
+    markup.add(
+        types.InlineKeyboardButton("7 dias", callback_data=f"trial:renew_7d:{trial_id}"),
+        types.InlineKeyboardButton("30 dias", callback_data=f"trial:renew_30d:{trial_id}"),
+    )
+    markup.add(types.InlineKeyboardButton("Cancelar", callback_data=f"trial:view:{trial_id}"))
     return markup
 
 
@@ -373,6 +389,56 @@ def trial_callback(call):
         trial["status"] = "trial_running"
         start_trial_bot(trial, on_expire=notify_trial_expired, rebuild_runtime=False)
         show_trial_detail(call.message.chat.id, call.message.message_id, find_trial(trial_id_int) or trial)
+        return
+
+    if action == "reactivate":
+        trial = find_trial(trial_id_int)
+        if not trial:
+            bot.edit_message_text("Teste nao encontrado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+            return
+        bot.edit_message_text(
+            f"<b>Reativar bot #{trial_id_int}</b>\n\nEscolha o novo prazo de funcionamento:",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=trial_reactivate_markup(trial_id_int),
+        )
+        return
+
+    if action.startswith("renew_"):
+        durations = {
+            "renew_1h": timedelta(hours=1),
+            "renew_1d": timedelta(days=1),
+            "renew_7d": timedelta(days=7),
+            "renew_30d": timedelta(days=30),
+        }
+        duration = durations.get(action)
+        trial = find_trial(trial_id_int)
+        if not duration or not trial:
+            bot.edit_message_text("Nao foi possivel reativar este bot.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+            return
+        expires_at = datetime.now() + duration
+        trial["expires_at"] = expires_at.isoformat()
+        trial["status"] = "trial_running"
+        trial["trial_minutes"] = max(int(duration.total_seconds() // 60), 1)
+        saved_trial = upsert_trial(trial)
+        update_request_status(trial_id_int, "trial_running")
+        try:
+            start_trial_bot(saved_trial, on_expire=notify_trial_expired, rebuild_runtime=False)
+        except Exception as exc:
+            update_trial_status(trial_id_int, "failed")
+            update_request_status(trial_id_int, "failed")
+            bot.edit_message_text(
+                f"Falha ao reativar o bot: <code>{str(exc)}</code>",
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                reply_markup=trial_admin_markup(find_trial(trial_id_int) or trial),
+            )
+            return
+        show_trial_detail(call.message.chat.id, call.message.message_id, find_trial(trial_id_int) or saved_trial)
+        bot.send_message(
+            call.message.chat.id,
+            f"Bot #{trial_id_int} reativado ate <code>{expires_at.strftime('%d/%m/%Y %H:%M:%S')}</code>.",
+        )
         return
 
     if action == "stop":
