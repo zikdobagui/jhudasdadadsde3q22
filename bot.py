@@ -379,22 +379,10 @@ def enviar_mensagem_followup(user_id):
             return
         
         # Monta a mensagem
-        texto = (
-            "👋 Olá! Vi que você ainda não realizou nenhuma compra.\n\n"
-            "Posso te ajudar? Escolha uma das opções abaixo 👇\n\n"
-            "🔔 Para receber novidades e lançamentos, use: /alertas"
-        )
+        texto = texto_inatividade_cliente()
         
         # Monta o teclado inline
-        markup = InlineKeyboardMarkup()
-        markup.row(
-            InlineKeyboardButton('🎧 Suporte ↗', url='https://t.me/RamonSuporteV'),
-            InlineKeyboardButton('🛒 Comprar Agora', callback_data='servicos')
-        )
-        markup.row(
-            InlineKeyboardButton('🛒 Carrinho', callback_data='ver_carrinho'),
-            InlineKeyboardButton('👀 Termos', callback_data='termos_uso')
-        )
+        markup = markup_inatividade_cliente('termos_uso', user_id)
         
         bot.send_message(user_id, texto, parse_mode='HTML', reply_markup=markup)
         
@@ -1778,6 +1766,7 @@ def painel_admin(message):
 
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton(f'{gear} Configuracoes Gerais', callback_data='configuracoes_geral'))
+        markup.row(InlineKeyboardButton(f'{users} Gerenciar Clientes', callback_data='gerenciar_clientes'))
         if usa_estoque_central():
             markup.row(InlineKeyboardButton(f'{money} Precos de Venda', callback_data='precos_revenda'),
                        InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
@@ -5838,23 +5827,27 @@ def gerar_menu_principal(user_id=None):
 
     return markup
 
-def markup_inatividade_cliente():
+def markup_inatividade_cliente(terms_callback='termos_inatividade', user_id=None):
     markup = InlineKeyboardMarkup()
     markup.row(
-        InlineKeyboardButton('👨‍💼 Suporte', url=api.CredentialsChange.SuporteInfo.link_suporte()),
-        InlineKeyboardButton('🛒 Comprar Agora', callback_data='servicos')
+        InlineKeyboardButton('[cor:azul] 🛍️ ABRIR LOJA', web_app=types.WebAppInfo(url=miniapp_url_for_user(user_id))),
+        InlineKeyboardButton('[cor:verde] 💳 ADICIONAR SALDO', callback_data='addsaldo')
     )
     markup.row(
-        InlineKeyboardButton('🛒 Carrinho', callback_data='ver_carrinho'),
-        InlineKeyboardButton('👀 Termos', callback_data='termos_inatividade')
+        InlineKeyboardButton('🎧 FALAR COM SUPORTE', url=api.CredentialsChange.SuporteInfo.link_suporte()),
+        InlineKeyboardButton('📜 VER TERMOS', callback_data=terms_callback)
     )
     return markup
 
 def texto_inatividade_cliente():
     return (
-        "👋 <b>Olá! Vi que você ainda não realizou nenhuma compra.</b>\n\n"
-        "Posso te ajudar? Escolha uma das opções abaixo 👇\n\n"
-        "🔔 Para receber novidades e lançamentos, use: /alertas"
+        "💎 <b>UMA EXPERIÊNCIA PREMIUM ESPERA POR VOCÊ</b>\n\n"
+        "Seu acesso à <b>Ramon Store</b> já está liberado. Escolha seu produto, "
+        "adicione saldo e receba tudo automaticamente pelo bot.\n\n"
+        "⚡ <b>Entrega rápida</b>\n"
+        "🔐 <b>Compra protegida</b>\n"
+        "🎧 <b>Suporte disponível</b>\n\n"
+        "<i>Novidades e ofertas exclusivas: /alertas</i>"
     )
 
 def enviar_aviso_inatividade_cliente(chat_id):
@@ -5862,7 +5855,7 @@ def enviar_aviso_inatividade_cliente(chat_id):
         chat_id,
         texto_inatividade_cliente(),
         parse_mode='HTML',
-        reply_markup=markup_inatividade_cliente()
+        reply_markup=markup_inatividade_cliente(user_id=chat_id)
     )
 
 @bot.message_handler(commands=['avisar_inativo'])
@@ -6351,34 +6344,89 @@ def confirmar_envio(message):
     )
     envio_thread.start()
 
+def resolver_cliente(consulta):
+    consulta = str(consulta or '').strip().lstrip('@')
+    if consulta.isdigit() and api.InfoUser.verificar_usuario(consulta):
+        return consulta
+    if not consulta:
+        return None
+    users_dir = getattr(database, 'USER_DATA_DIR', os.path.join('database', 'users'))
+    try:
+        for filename in os.listdir(users_dir):
+            if not filename.endswith('.json'):
+                continue
+            user_id = filename[:-5]
+            user_data = database.load_user_data(user_id)
+            username = str((user_data or {}).get('username', '')).strip().lstrip('@')
+            if username.casefold() == consulta.casefold():
+                return user_id
+    except OSError:
+        pass
+    return None
+
+
+def menu_clientes_admin(message):
+    users_dir = getattr(database, 'USER_DATA_DIR', os.path.join('database', 'users'))
+    clientes = []
+    try:
+        arquivos = [name for name in os.listdir(users_dir) if name.endswith('.json')]
+        arquivos.sort(key=lambda name: os.path.getmtime(os.path.join(users_dir, name)), reverse=True)
+        for filename in arquivos[:5]:
+            user_data = database.load_user_data(filename[:-5]) or {}
+            clientes.append((str(user_data.get('id', filename[:-5])), str(user_data.get('username', '')).lstrip('@')))
+    except OSError:
+        pass
+
+    texto = (
+        '👥 <b>CENTRAL DE CLIENTES</b>\n\n'
+        'Pesquise por <b>ID</b> ou <b>@username</b> para consultar cadastro, saldo, compras e pagamentos.\n\n'
+        f'📊 <b>Total cadastrado:</b> {api.Admin.total_users()}\n'
+        '⚡ <i>Ações administrativas ficam disponíveis após selecionar o cliente.</i>'
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('[cor:azul] 🔎 PESQUISAR CLIENTE', callback_data='pesquisar_cliente_admin'))
+    for user_id, username in clientes:
+        label = f'👤 @{username}' if username and not username.lower().startswith('user') else f'👤 Cliente {user_id}'
+        markup.row(InlineKeyboardButton(label[:40], callback_data=f'abrir_cliente {user_id}'))
+    markup.row(InlineKeyboardButton('↩️ VOLTAR AO PAINEL', callback_data='voltar_paineladm'))
+    safe_edit_message(message, texto, reply_markup=markup)
+
+
+def exibir_cliente_admin(chat_id, consulta):
+    user_id = resolver_cliente(consulta)
+    if not user_id:
+        bot.send_message(chat_id, '❌ <b>Cliente não encontrado.</b>\n\nConfira o ID ou @username e tente novamente.', parse_mode='HTML')
+        return
+    user_data = database.load_user_data(user_id) or {}
+    username = str(user_data.get('username', '')).strip().lstrip('@')
+    nome = ' '.join(filter(None, (str(user_data.get('first_name', '')).strip(), str(user_data.get('last_name', '')).strip())))
+    banido = api.InfoUser.verificar_ban(user_id)
+    texto = (
+        '💎 <b>PERFIL DO CLIENTE</b>\n\n'
+        f'👤 <b>Nome:</b> {html.escape(nome or "Não informado")}\n'
+        f'🔗 <b>Usuário:</b> {"@" + html.escape(username) if username else "Sem @username"}\n'
+        f'🆔 <b>ID:</b> <code>{user_id}</code>\n'
+        f'💰 <b>Saldo:</b> <code>R$ {api.InfoUser.saldo(user_id):.2f}</code>\n'
+        f'🛍️ <b>Compras:</b> {api.InfoUser.total_compras(user_id)}\n'
+        f'💳 <b>PIX inserido:</b> R$ {api.InfoUser.pix_inseridos(user_id):.2f}\n'
+        f'👥 <b>Indicados:</b> {api.InfoUser.quantidade_afiliados(user_id)}\n'
+        f'🛡️ <b>Status:</b> {"Bloqueado" if banido else "Ativo"}'
+    )
+    markup = InlineKeyboardMarkup()
+    action = 'desbanir' if banido else 'banir'
+    markup.row(InlineKeyboardButton('[cor:azul] 💰 ALTERAR SALDO', callback_data=f'mudar_saldo {user_id}'))
+    markup.row(
+        InlineKeyboardButton('📄 HISTÓRICO', callback_data=f'baixar_historico {user_id}'),
+        InlineKeyboardButton('✅ DESBLOQUEAR' if banido else '🚫 BLOQUEAR', callback_data=f'{action} {user_id}')
+    )
+    markup.row(InlineKeyboardButton('↩️ CENTRAL DE CLIENTES', callback_data='gerenciar_clientes'))
+    bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
+
+
 def pesquisar_usuario(message):
-    """
-    Pesquisa um usuÃ¡rio e exibe as informaÃ§Ãµes se encontrado.
-    """
-    id = message.text.strip()
-    if api.InfoUser.verificar_usuario(id):
-        status_ban = "â€¢â€¢â€¢? DESBANIR" if api.InfoUser.verificar_ban(id) else "â€¢â€¢â€¢? BANIR"
-        callback_ban = "desbanir" if api.InfoUser.verificar_ban(id) else "banir"
-        
-        texto = (
-            f'â€¢ <b>UsuÃ©rio Encontrado</b> âœ…\n\n'
-            f'ðŸ“‹ <b>InformaÃ§Ãµes</b>\n'
-            f'â€¢ <b>ID:</b> <code>{id}</code>\n'
-            f'â€¢ <b>Saldo:</b> <code>R${api.InfoUser.saldo(id):.2f}</code>\n'
-            f'â€¢ <b>Acessos Comprados:</b> <code>{api.InfoUser.total_compras(id)}</code>\n'
-            f'â€¢ <b>PIX Inseridos:</b> <code>R${api.InfoUser.pix_inseridos(id):.2f}</code>\n'
-            f'â€¢ <b>Indicados:</b> <code>{api.InfoUser.quantidade_afiliados(id)}</code>\n'
-            f'â€¢ <b>Gift Resgatado:</b> <code>R${api.InfoUser.gifts_resgatados(id):.2f}</code>'
-        )
-        
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton(status_ban, callback_data=f'{callback_ban} {id}'))
-        markup.row(InlineKeyboardButton('â€¢ Alterar Saldo', callback_data=f'mudar_saldo {id}'),
-                   InlineKeyboardButton('â€¢ Baixar HistÃ©rico', callback_data=f'baixar_historico {id}'))
-        
-        bot.send_message(chat_id=message.chat.id, text=texto, parse_mode='HTML', reply_markup=markup)
-    else:
-        bot.reply_to(message, "âœ… UsuÃ©rio nÃ£o encontrado.")
+    if not is_owner_or_admin(message.from_user.id):
+        return
+    exibir_cliente_admin(message.chat.id, message.text)
 
 def mudar_saldo(message, id):
     saldo = message.text
@@ -10765,6 +10813,33 @@ def callback_query(call):
         bot.register_next_step_handler(call.message, multiplicador_para_converter)
 
     # =============== ConfiguraÃ§Ãµes de usuarios
+    if call.data == 'gerenciar_clientes':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        menu_clientes_admin(call.message)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data == 'pesquisar_cliente_admin':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        prompt = bot.send_message(
+            call.message.chat.id,
+            '🔎 <b>PESQUISAR CLIENTE</b>\n\nEnvie o <b>ID</b> ou <b>@username</b> do cliente:',
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(prompt, pesquisar_usuario)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data.startswith('abrir_cliente '):
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        exibir_cliente_admin(call.message.chat.id, call.data.split(maxsplit=1)[1])
+        bot.answer_callback_query(call.id)
+        return
     if call.data == 'configurar_usuarios':
         configurar_usuarios(call.message)
     if call.data == 'transmitir_todos':
@@ -10796,7 +10871,7 @@ def callback_query(call):
     if call.data == 'pesquisar_usuario':
         bot.send_message(
             call.message.chat.id,
-            "Digite o id do usuario:",
+            "Digite o ID ou @username do cliente:",
             reply_markup=types.ForceReply()
         )
         bot.register_next_step_handler(call.message, pesquisar_usuario)
