@@ -27,8 +27,8 @@ document.querySelector('#userPurchases').href = `https://t.me/${encodeURICompone
 
 tg?.ready();
 tg?.expand();
-tg?.setHeaderColor?.('#061f22');
-tg?.setBackgroundColor?.('#061f22');
+tg?.setHeaderColor?.('#020b24');
+tg?.setBackgroundColor?.('#020b24');
 
 function category(name) {
   const value = name.toLocaleLowerCase('pt-BR');
@@ -136,7 +136,7 @@ function renderTelegramUser() {
   userId.textContent = currentUserId;
   if (tgUser?.photo_url) {
     userAvatar.src = tgUser.photo_url;
-    userCover.style.backgroundImage = `linear-gradient(135deg, rgba(21, 193, 187, .18), rgba(4, 32, 35, .88)), url("${tgUser.photo_url}")`;
+    userCover.style.backgroundImage = `linear-gradient(135deg, rgba(16, 77, 255, .22), rgba(2, 11, 36, .86)), url("${tgUser.photo_url}")`;
   }
 }
 
@@ -149,8 +149,15 @@ function loadUserBalance() {
     })
     .then((profile) => {
       userBalance.textContent = money.format(Number(profile.saldo || 0));
+      const profileName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+      if (profileName && !tgUser) userName.textContent = profileName;
       if (profile.username && !tgUser?.username) userUsername.textContent = `@${profile.username}`;
       if (profile.id) userId.textContent = profile.id;
+      if (profile.avatar_url && !tgUser?.photo_url) {
+        const avatarUrl = `${profile.avatar_url}&v=${Date.now()}`;
+        userAvatar.src = avatarUrl;
+        userCover.style.backgroundImage = `linear-gradient(135deg, rgba(16, 77, 255, .22), rgba(2, 11, 36, .86)), url("${avatarUrl}")`;
+      }
     })
     .catch(() => {
       userBalance.textContent = 'Saldo indisponível';

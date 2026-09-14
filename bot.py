@@ -5765,11 +5765,21 @@ def get_current_bot_username():
 
 def sync_telegram_username(user):
     username = str(getattr(user, 'username', '') or '').strip().lstrip('@')
-    if not username:
-        return
     user_data = database.load_user_data(user.id)
-    if isinstance(user_data, dict) and user_data.get('username') != username:
-        user_data['username'] = username
+    if not isinstance(user_data, dict):
+        return
+    changed = False
+    profile_fields = {
+        'first_name': str(getattr(user, 'first_name', '') or '').strip(),
+        'last_name': str(getattr(user, 'last_name', '') or '').strip(),
+    }
+    if username:
+        profile_fields['username'] = username
+    for field, value in profile_fields.items():
+        if value and user_data.get(field) != value:
+            user_data[field] = value
+            changed = True
+    if changed:
         database.save_user_data(user.id, user_data)
 
 

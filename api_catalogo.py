@@ -12,7 +12,7 @@ NÃO expõe email/senha — só nome, preço, estoque e imagem.
 """
 
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from collections import defaultdict, deque
 import hmac
 import json
@@ -24,6 +24,7 @@ import tempfile
 import threading
 import time
 import hashlib
+import urllib.request
 
 import database
 
@@ -72,7 +73,7 @@ def _save_user_for_billing(user_id, user_data):
 def _load_credentials():
     try:
         if os.path.exists(CREDENTIALS_FILE):
-            with open(CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
+            with open(CREDENTIALS_FILE, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
             if isinstance(data, dict):
                 return data
@@ -148,6 +149,19 @@ def _clean_text(value, max_length=MAX_FIELD_LENGTH):
     return text.replace('\x00', '')
 
 
+def _telegram_chat_profile(user_id):
+    token = str(_load_credentials().get('api-bot', '')).strip()
+    if not token:
+        return {}
+    try:
+        url = f'https://api.telegram.org/bot{token}/getChat?chat_id={user_id}'
+        with urllib.request.urlopen(url, timeout=8) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+        return payload.get('result', {}) if payload.get('ok') else {}
+    except Exception:
+        return {}
+
+
 def _public_user_profile(user_id):
     user_id = _clean_text(user_id, 32)
     if not user_id.isdigit():
@@ -159,14 +173,52 @@ def _public_user_profile(user_id):
             'username': '',
             'saldo': 0,
         }
+    first_name = _clean_text(user_data.get('first_name', ''), 64)
+    last_name = _clean_text(user_data.get('last_name', ''), 64)
     username = _clean_text(user_data.get('username', ''), 64).lstrip('@')
     if username.lower() in ('usuario sem @', 'usuário sem @') or username.lower().startswith('user' + user_id):
         username = ''
+    if not first_name or not username:
+        telegram_profile = _telegram_chat_profile(user_id)
+        first_name = first_name or _clean_text(telegram_profile.get('first_name', ''), 64)
+        last_name = last_name or _clean_text(telegram_profile.get('last_name', ''), 64)
+        username = username or _clean_text(telegram_profile.get('username', ''), 64).lstrip('@')
     return {
         'id': str(user_data.get('id', user_id)),
         'username': username,
+        'first_name': first_name,
+        'last_name': last_name,
+        'avatar_url': f'/api/user/avatar?id={user_id}',
         'saldo': round(float(user_data.get('saldo', 0) or 0), 2),
     }
+
+
+def _telegram_avatar(user_id):
+    if not str(user_id).isdigit() or database.load_user_data(user_id) is None:
+        return None
+    token = str(_load_credentials().get('api-bot', '')).strip()
+    if not token:
+        return None
+    try:
+        photos_url = f'https://api.telegram.org/bot{token}/getUserProfilePhotos?user_id={user_id}&limit=1'
+        with urllib.request.urlopen(photos_url, timeout=8) as response:
+            photos = json.loads(response.read().decode('utf-8'))
+        photo_sets = photos.get('result', {}).get('photos', [])
+        if not photos.get('ok') or not photo_sets:
+            return None
+        file_id = photo_sets[0][-1]['file_id']
+        with urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getFile?file_id={quote(file_id)}', timeout=8) as response:
+            file_info = json.loads(response.read().decode('utf-8'))
+        file_path = file_info.get('result', {}).get('file_path')
+        if not file_info.get('ok') or not file_path:
+            return None
+        with urllib.request.urlopen(f'https://api.telegram.org/file/bot{token}/{file_path}', timeout=10) as response:
+            content_type = response.headers.get_content_type()
+            if content_type == 'application/octet-stream':
+                content_type = mimetypes.guess_type(file_path)[0] or 'image/jpeg'
+            return response.read(), content_type
+    except Exception:
+        return None
 
 
 def _public_error(reason):
@@ -369,6 +421,21 @@ class Handler(SimpleHTTPRequestHandler):
                 self._responder_json(400, {'error': 'invalid_user'})
                 return
             self._responder_json(200, profile)
+            return
+
+        if path == '/api/user/avatar':
+            user_id = parse_qs(parsed_url.query).get('id', [''])[0]
+            avatar = _telegram_avatar(user_id)
+            if avatar is None:
+                self.send_error(404, 'Avatar not found')
+                return
+            body, content_type = avatar
+            self.send_response(200)
+            self.send_header('Content-Type', content_type or 'image/jpeg')
+            self.send_header('Cache-Control', 'private, max-age=300')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if path == '/health':
