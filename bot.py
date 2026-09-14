@@ -215,6 +215,7 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
 MINIAPP_URL = "https://vendasdoramon.squareweb.app/"
+START_IMAGE_URL = "https://i.ibb.co/J4NKTnw/IMG-8242.png"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')
@@ -5748,11 +5749,40 @@ def processar_lote_usuarios(
             if total_enviados % 50 == 0:
                 atualizar_status_envio(bot, status_message_info, stats)
 
+_current_bot_username = None
+
+
+def get_current_bot_username():
+    global _current_bot_username
+    if _current_bot_username:
+        return _current_bot_username
+    try:
+        _current_bot_username = str(bot.get_me().username or '').lstrip('@')
+    except Exception:
+        configured = str(api.CredentialsChange.user_bot() or '').rstrip('/').rsplit('/', 1)[-1]
+        _current_bot_username = configured.lstrip('@')
+    return _current_bot_username
+
+
+def sync_telegram_username(user):
+    username = str(getattr(user, 'username', '') or '').strip().lstrip('@')
+    if not username:
+        return
+    user_data = database.load_user_data(user.id)
+    if isinstance(user_data, dict) and user_data.get('username') != username:
+        user_data['username'] = username
+        database.save_user_data(user.id, user_data)
+
+
 def miniapp_url_for_user(user_id=None):
     if not user_id:
         return MINIAPP_URL
+    query = urllib.parse.urlencode({
+        'user_id': str(user_id),
+        'bot_username': get_current_bot_username(),
+    })
     separator = '&' if '?' in MINIAPP_URL else '?'
-    return f'{MINIAPP_URL}{separator}user_id={urllib.parse.quote(str(user_id))}'
+    return f'{MINIAPP_URL}{separator}{query}'
 
 
 def gerar_menu_principal(user_id=None):
@@ -7044,6 +7074,8 @@ def handle_start(message):
         except Exception as e:
             bot.send_message(api.CredentialsChange.id_dono(), f"Log nÃ£o enviada!\nMotivo: {e}")
 
+    sync_telegram_username(message.from_user)
+
     if len(message.text.split()) == 2:
         referral_id = message.text.split()[1]
         if referral_id.isdigit() and referral_id != str(message.from_user.id):
@@ -7114,12 +7146,21 @@ def handle_start(message):
         )
         return
 
-    send_html_or_plain(
-        chat_id=message.chat.id,
-        text=texto,
-        reply_markup=markup,
-        disable_web_page_preview=True
-    )
+    try:
+        bot.send_photo(
+            chat_id=message.chat.id,
+            photo=START_IMAGE_URL,
+            caption=texto,
+            parse_mode='HTML',
+            reply_markup=markup
+        )
+    except Exception:
+        send_html_or_plain(
+            chat_id=message.chat.id,
+            text=texto,
+            reply_markup=markup,
+            disable_web_page_preview=True
+        )
 
 def perfil(call):
     message = call.message

@@ -1,6 +1,7 @@
 const tg = window.Telegram?.WebApp;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const botUsername = 'vendasdoramon_bot';
+const params = new URLSearchParams(window.location.search);
+const botUsername = (params.get('bot_username') || 'vendasdoramon_bot').replace(/^@/, '');
 const defaultProductImage = 'assets/store-banner.png';
 const state = { products: [], cart: new Map(), filter: 'todos', query: '' };
 
@@ -20,8 +21,9 @@ const userCover = document.querySelector('#userCover');
 const userBalance = document.querySelector('#userBalance');
 const userId = document.querySelector('#userId');
 const tgUser = tg?.initDataUnsafe?.user;
-const params = new URLSearchParams(window.location.search);
 const currentUserId = tgUser?.id || params.get('user_id') || params.get('id');
+
+document.querySelector('#userPurchases').href = `https://t.me/${encodeURIComponent(botUsername)}`;
 
 tg?.ready();
 tg?.expand();

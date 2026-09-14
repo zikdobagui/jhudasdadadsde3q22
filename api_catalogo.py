@@ -159,9 +159,12 @@ def _public_user_profile(user_id):
             'username': '',
             'saldo': 0,
         }
+    username = _clean_text(user_data.get('username', ''), 64).lstrip('@')
+    if username.lower() in ('usuario sem @', 'usuário sem @') or username.lower().startswith('user' + user_id):
+        username = ''
     return {
         'id': str(user_data.get('id', user_id)),
-        'username': _clean_text(user_data.get('username', ''), 64).lstrip('@'),
+        'username': username,
         'saldo': round(float(user_data.get('saldo', 0) or 0), 2),
     }
 
