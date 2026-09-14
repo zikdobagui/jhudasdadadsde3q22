@@ -130,16 +130,18 @@ def _terminate_pid(pid):
         return False
 
 
-def _prepare_child_credentials(runtime_path, trial):
-    source = os.path.join(PROJECT_DIR, "settings", "credenciais.example.json")
+def _prepare_child_credentials(runtime_path, trial, preserve_existing=False):
+    destination = os.path.join(runtime_path, "settings", "credenciais.json")
+    source = destination if preserve_existing and os.path.isfile(destination) else os.path.join(PROJECT_DIR, "settings", "credenciais.example.json")
     credentials = _load_json(source)
     credentials["id_dono"] = int(trial["admin_id"])
     credentials["api-bot"] = trial["token"]
     credentials["user_bot"] = trial.get("username", "")
     support_url = trial.get("support_url") or "https://t.me/RamonSuporteV"
     credentials["link_suporte"] = support_url
-    credentials["central_stock_api_url"] = ""
-    credentials["central_stock_api_key"] = ""
+    if not preserve_existing:
+        credentials["central_stock_api_url"] = ""
+        credentials["central_stock_api_key"] = ""
     credentials["child_api_only"] = True
     credentials["child_bot_id"] = f"trial-{trial['id']}"
     credentials["reseller_admin_id"] = str(trial["admin_id"])
@@ -147,7 +149,7 @@ def _prepare_child_credentials(runtime_path, trial):
     # O vencimento interno do bot filho fica distante para nao bloquear o teste.
     credentials["vencimento_bot"] = "01/01/2099"
     credentials["maintance"] = "off"
-    _save_json(os.path.join(runtime_path, "settings", "credenciais.json"), credentials)
+    _save_json(destination, credentials)
 
 
 def start_trial_bot(trial, on_expire=None, rebuild_runtime=True):
@@ -166,7 +168,7 @@ def start_trial_bot(trial, on_expire=None, rebuild_runtime=True):
         shutil.copytree(PROJECT_DIR, runtime_path, ignore=_ignore_runtime_files)
 
     _sanitize_child_runtime(runtime_path, reset_customer_data=runtime_created)
-    _prepare_child_credentials(runtime_path, trial)
+    _prepare_child_credentials(runtime_path, trial, preserve_existing=not runtime_created)
 
     process = subprocess.Popen(
         [sys.executable, "bot.py"],

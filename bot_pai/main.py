@@ -41,6 +41,7 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
 pending_new_bots = {}
 pending_trials = {}
 pending_bot_edits = {}
+pending_trial_edits = {}
 
 
 def load_config():
@@ -55,6 +56,33 @@ def load_config():
 config = load_config()
 bot = telebot.TeleBot(config["bot_token"], parse_mode="HTML")
 admin_ids = {int(admin_id) for admin_id in config.get("admin_ids", [])}
+
+_original_button_to_dict = types.InlineKeyboardButton.to_dict
+PREMIUM_BUTTON_ICONS = {
+    "default": "5447410659077661506",
+    "bot": "5210956306952758910",
+    "stock": "5350486389806868244",
+    "delete": "5447644880824181073",
+}
+
+
+def _premium_button_to_dict(self):
+    result = _original_button_to_dict(self)
+    text = str(result.get("text", "")).lower()
+    icon = PREMIUM_BUTTON_ICONS["default"]
+    style = "primary"
+    if any(word in text for word in ("excluir", "desligar", "suspender", "cancelar")):
+        icon, style = PREMIUM_BUTTON_ICONS["delete"], "danger"
+    elif any(word in text for word in ("ativar", "reativar", "ligar", "novo", "testar")):
+        icon, style = PREMIUM_BUTTON_ICONS["stock"], "success"
+    elif "bot" in text:
+        icon = PREMIUM_BUTTON_ICONS["bot"]
+    result.setdefault("icon_custom_emoji_id", icon)
+    result.setdefault("style", style)
+    return result
+
+
+types.InlineKeyboardButton.to_dict = _premium_button_to_dict
 
 
 def user_id_from(obj):
@@ -86,29 +114,29 @@ def require_admin_message(func):
 def main_menu_markup():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Novo bot", callback_data="menu:new_bot"),
-        types.InlineKeyboardButton("Bots filhos", callback_data="menu:bots"),
+        types.InlineKeyboardButton("NOVO BOT", callback_data="menu:new_bot"),
+        types.InlineKeyboardButton("BOTS FILHOS", callback_data="menu:bots"),
     )
     markup.add(
-        types.InlineKeyboardButton("Estoque", callback_data="menu:stock"),
-        types.InlineKeyboardButton("Pedidos", callback_data="menu:requests"),
+        types.InlineKeyboardButton("ESTOQUE CENTRAL", callback_data="menu:stock"),
+        types.InlineKeyboardButton("PEDIDOS", callback_data="menu:requests"),
     )
     markup.add(
-        types.InlineKeyboardButton("Ver como cliente", callback_data="client:home"),
-        types.InlineKeyboardButton("Atualizar", callback_data="menu:home"),
+        types.InlineKeyboardButton("VISÃO DO CLIENTE", callback_data="client:home"),
+        types.InlineKeyboardButton("ATUALIZAR", callback_data="menu:home"),
     )
     return markup
 
 
 def customer_menu_markup(show_admin=False):
-    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
-        types.InlineKeyboardButton("Testar bot", callback_data="client:test"),
-        types.InlineKeyboardButton("Alugar bot", callback_data="client:rent"),
-        types.InlineKeyboardButton("Falar com suporte", callback_data="client:support"),
+        types.InlineKeyboardButton("TESTAR BOT", callback_data="client:test"),
+        types.InlineKeyboardButton("ALUGAR BOT", callback_data="client:rent"),
     )
+    markup.add(types.InlineKeyboardButton("SUPORTE PREMIUM", callback_data="client:support"))
     if show_admin:
-        markup.add(types.InlineKeyboardButton("Painel admin", callback_data="menu:home"))
+        markup.add(types.InlineKeyboardButton("PAINEL ADMIN", callback_data="menu:home"))
     return markup
 
 
@@ -142,10 +170,13 @@ def trial_admin_markup(trial):
     else:
         markup.add(types.InlineKeyboardButton("Reativar", callback_data=f"trial:reactivate:{trial_id}"))
     markup.add(
-        types.InlineKeyboardButton("Excluir", callback_data=f"trial:confirm_delete:{trial_id}"),
+        types.InlineKeyboardButton("Editar", callback_data=f"trial:edit:{trial_id}"),
         types.InlineKeyboardButton("Atualizar", callback_data=f"trial:view:{trial_id}"),
     )
-    markup.add(types.InlineKeyboardButton("Bots", callback_data="menu:bots"))
+    markup.add(
+        types.InlineKeyboardButton("Excluir", callback_data=f"trial:confirm_delete:{trial_id}"),
+        types.InlineKeyboardButton("Bots", callback_data="menu:bots"),
+    )
     markup.add(types.InlineKeyboardButton("Menu", callback_data="menu:home"))
     return markup
 
@@ -161,6 +192,21 @@ def trial_reactivate_markup(trial_id):
         types.InlineKeyboardButton("30 dias", callback_data=f"trial:renew_30d:{trial_id}"),
     )
     markup.add(types.InlineKeyboardButton("Cancelar", callback_data=f"trial:view:{trial_id}"))
+    return markup
+
+
+def trial_edit_markup(trial_id):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("Nome da loja", callback_data=f"trialedit:name:{trial_id}"),
+        types.InlineKeyboardButton("Token", callback_data=f"trialedit:token:{trial_id}"),
+    )
+    markup.add(
+        types.InlineKeyboardButton("Admin", callback_data=f"trialedit:admin:{trial_id}"),
+        types.InlineKeyboardButton("@Usuario", callback_data=f"trialedit:username:{trial_id}"),
+    )
+    markup.add(types.InlineKeyboardButton("Vencimento", callback_data=f"trial:reactivate:{trial_id}"))
+    markup.add(types.InlineKeyboardButton("Voltar", callback_data=f"trial:view:{trial_id}"))
     return markup
 
 
@@ -205,7 +251,9 @@ def home_text():
     pending = sum(1 for item in requests if item.get("status") == "pending")
     return dedent(
         f"""
-        <b>Painel admin</b>
+        💎 <b>CENTRAL DE CONTROLE PREMIUM</b>
+
+        Gerencie toda sua operação em um só lugar.
 
         Bots cadastrados: <code>{len(children)}</code>
         Ativos: <code>{active}</code>
@@ -218,9 +266,9 @@ def home_text():
 def customer_home_text():
     return dedent(
         """
-        <b>Aluguel de bot</b>
+        🚀 <b>CRIE SUA PRÓPRIA LOJA AUTOMÁTICA</b>
 
-        Escolha uma opção abaixo para testar ou solicitar seu bot.
+        Teste nossa estrutura premium ou solicite seu bot completo.
         """
     ).strip()
 
@@ -401,6 +449,19 @@ def trial_callback(call):
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             reply_markup=trial_reactivate_markup(trial_id_int),
+        )
+        return
+
+    if action == "edit":
+        trial = find_trial(trial_id_int)
+        if not trial:
+            bot.edit_message_text("Bot filho nao encontrado.", chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=back_markup())
+            return
+        bot.edit_message_text(
+            f"<b>EDITAR BOT #{trial_id_int}</b>\n\nEscolha o dado que deseja atualizar:",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=trial_edit_markup(trial_id_int),
         )
         return
 
@@ -806,7 +867,10 @@ def show_trial_detail(chat_id, message_id, trial):
         Minutos restantes: <code>{remaining}</code>
         """
     ).strip()
-    bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=trial_admin_markup(trial))
+    if message_id:
+        bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=trial_admin_markup(trial))
+    else:
+        bot.send_message(chat_id, text, reply_markup=trial_admin_markup(trial))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("botedit:"))
@@ -830,6 +894,75 @@ def bot_edit_callback(call):
     pending_bot_edits[call.from_user.id] = {"bot_id": int(child_id), "field": field}
     msg = bot.send_message(call.message.chat.id, f"Envie o {labels.get(field, 'novo valor')}.")
     bot.register_next_step_handler(msg, collect_bot_edit)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("trialedit:"))
+def trial_edit_callback(call):
+    if not is_admin_obj(call):
+        deny(call)
+        return
+    _, field, trial_id = call.data.split(":", 2)
+    trial = find_trial(trial_id)
+    if not trial:
+        bot.answer_callback_query(call.id, "Bot filho nao encontrado.", show_alert=True)
+        return
+    labels = {
+        "name": "novo nome da loja",
+        "token": "novo token completo do BotFather",
+        "admin": "novo ID Telegram do administrador",
+        "username": "novo @username do bot",
+    }
+    if field not in labels:
+        bot.answer_callback_query(call.id, "Campo invalido.", show_alert=True)
+        return
+    bot.answer_callback_query(call.id)
+    pending_trial_edits[call.from_user.id] = {"trial_id": int(trial_id), "field": field}
+    msg = bot.send_message(call.message.chat.id, f"Envie o {labels[field]}.")
+    bot.register_next_step_handler(msg, collect_trial_edit)
+
+
+def collect_trial_edit(message):
+    if not is_admin_obj(message):
+        deny(message)
+        return
+    state = pending_trial_edits.pop(message.from_user.id, None)
+    if not state:
+        return
+    value = (message.text or "").strip()
+    trial = find_trial(state["trial_id"])
+    if not trial:
+        bot.send_message(message.chat.id, "Bot filho nao encontrado.")
+        return
+    field = state["field"]
+    if field == "token" and (":" not in value or len(value) < 30):
+        bot.send_message(message.chat.id, "Token invalido. Envie o token completo do BotFather.")
+        return
+    if field == "admin":
+        try:
+            value = int(value)
+        except ValueError:
+            bot.send_message(message.chat.id, "ID invalido. Envie apenas numeros.")
+            return
+    if field == "username":
+        value = value.lstrip("@")
+    key_map = {"name": "store_name", "token": "token", "admin": "admin_id", "username": "username"}
+    trial[key_map[field]] = value
+    saved_trial = upsert_trial(trial)
+    if field == "token":
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+        except Exception:
+            pass
+    if trial.get("status") == "trial_running":
+        try:
+            stop_trial_bot(state["trial_id"], "restart", on_expire=None)
+            start_trial_bot(saved_trial, on_expire=notify_trial_expired, rebuild_runtime=False)
+        except Exception as exc:
+            update_trial_status(state["trial_id"], "failed")
+            bot.send_message(message.chat.id, f"Dados salvos, mas o bot nao reiniciou: <code>{exc}</code>")
+            return
+    bot.send_message(message.chat.id, "Dados atualizados com sucesso.")
+    show_trial_detail(message.chat.id, None, find_trial(state["trial_id"]) or saved_trial)
 
 
 def collect_bot_edit(message):
