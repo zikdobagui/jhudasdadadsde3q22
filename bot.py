@@ -7102,14 +7102,16 @@ def handle_start(message):
             chat_id=message.chat.id,
             message_id=message.message_id,
             text=texto,
-            reply_markup=markup
+            reply_markup=markup,
+            disable_web_page_preview=True
         )
         return
 
     send_html_or_plain(
         chat_id=message.chat.id,
         text=texto,
-        reply_markup=markup
+        reply_markup=markup,
+        disable_web_page_preview=True
     )
 
 def perfil(call):
@@ -7159,7 +7161,8 @@ def enviar_menu_inicial(message):
     send_html_or_plain(
         chat_id=message.chat.id,
         text=texto,
-        reply_markup=markup
+        reply_markup=markup,
+        disable_web_page_preview=True
     )
 
 @bot.message_handler(commands=['api_minimo'])
@@ -10252,14 +10255,15 @@ def callback_query(call):
 
     if call.data == 'menu_start':
         # Voltar ao menu principal
-        texto = api.Textos.start(call.message)
+        texto = decorate_start_text(call.message)
         markup = gerar_menu_principal()
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             text=texto,
             parse_mode='HTML',
-            reply_markup=markup
+            reply_markup=markup,
+            disable_web_page_preview=True
         )
         return
 
