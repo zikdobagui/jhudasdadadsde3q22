@@ -5748,10 +5748,17 @@ def processar_lote_usuarios(
             if total_enviados % 50 == 0:
                 atualizar_status_envio(bot, status_message_info, stats)
 
-def gerar_menu_principal():
+def miniapp_url_for_user(user_id=None):
+    if not user_id:
+        return MINIAPP_URL
+    separator = '&' if '?' in MINIAPP_URL else '?'
+    return f'{MINIAPP_URL}{separator}user_id={urllib.parse.quote(str(user_id))}'
+
+
+def gerar_menu_principal(user_id=None):
     bt_miniapp = InlineKeyboardButton(
         botao_personalizado('abrir_loja', '🛍️ ABRIR LOJA'),
-        web_app=types.WebAppInfo(url=MINIAPP_URL)
+        web_app=types.WebAppInfo(url=miniapp_url_for_user(user_id))
     )
     bt_comprar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('catalogo', 'VER CATÃLOGO'), callback_data='servicos'), 'catalogo')
     bt_addsaldo = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('recarga_pix', 'RECARGA / PIX'), callback_data='addsaldo'), 'pix')
@@ -7092,7 +7099,7 @@ def handle_start(message):
     texto = decorate_start_text(message)
 
     # Usando a funÃ§Ã£o gerar_menu_principal() para os botÃµes
-    markup = gerar_menu_principal()
+    markup = gerar_menu_principal(message.from_user.id)
 
     # Agenda mensagem de follow-up após 5 minutos
     agendar_followup(message.from_user.id)
@@ -7156,7 +7163,7 @@ def perfil(call):
 
 def enviar_menu_inicial(message):
     texto = decorate_start_text(message)   
-    markup = gerar_menu_principal()       
+    markup = gerar_menu_principal(message.from_user.id)
     
     send_html_or_plain(
         chat_id=message.chat.id,
@@ -10256,7 +10263,7 @@ def callback_query(call):
     if call.data == 'menu_start':
         # Voltar ao menu principal
         texto = decorate_start_text(call.message)
-        markup = gerar_menu_principal()
+        markup = gerar_menu_principal(call.from_user.id)
         bot.edit_message_text(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,

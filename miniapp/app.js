@@ -12,6 +12,7 @@ const cartItems = document.querySelector('#cartItems');
 const cartTotal = document.querySelector('#cartTotal');
 const checkout = document.querySelector('#checkoutButton');
 const toast = document.querySelector('#toast');
+const featuredProduct = document.querySelector('#featuredProduct');
 const userName = document.querySelector('#userName');
 const userUsername = document.querySelector('#userUsername');
 const userAvatar = document.querySelector('#userAvatar');
@@ -19,11 +20,13 @@ const userCover = document.querySelector('#userCover');
 const userBalance = document.querySelector('#userBalance');
 const userId = document.querySelector('#userId');
 const tgUser = tg?.initDataUnsafe?.user;
+const params = new URLSearchParams(window.location.search);
+const currentUserId = tgUser?.id || params.get('user_id') || params.get('id');
 
 tg?.ready();
 tg?.expand();
-tg?.setHeaderColor?.('#031a44');
-tg?.setBackgroundColor?.('#031a44');
+tg?.setHeaderColor?.('#061f22');
+tg?.setBackgroundColor?.('#061f22');
 
 function category(name) {
   const value = name.toLocaleLowerCase('pt-BR');
@@ -60,13 +63,33 @@ function renderProducts() {
   list.innerHTML = products.map((product) => `
     <article class="product">
       <img class="product-image" src="${escapeHtml(imageFor(product))}" alt="${escapeHtml(cleanName(product.name))}" loading="lazy" onerror="this.onerror=null;this.src='${defaultProductImage}'">
-      <h3>${escapeHtml(cleanName(product.name))}</h3>
-      <p class="stock">${product.stock} unidade${product.stock === 1 ? '' : 's'} disponível${product.stock === 1 ? '' : 'is'}</p>
-      <div class="product-bottom">
+      <div class="product-body">
+        <h3>${escapeHtml(cleanName(product.name))}</h3>
         <strong class="price">${money.format(product.price)}</strong>
-        <button class="add-button" type="button" data-add="${escapeHtml(product.name)}" aria-label="Adicionar ao carrinho">+</button>
+        <p class="stock"><span aria-hidden="true"></span>${product.stock} disponível${product.stock === 1 ? '' : 'is'}</p>
+      </div>
+      <div class="product-bottom">
+        <button class="add-button" type="button" data-add="${escapeHtml(product.name)}" aria-label="Adicionar ${escapeHtml(cleanName(product.name))} ao carrinho">🛒 Adicionar</button>
       </div>
     </article>`).join('');
+}
+
+function renderFeaturedProduct() {
+  const product = state.products.at(-1) || state.products[0];
+  if (!product) {
+    featuredProduct.innerHTML = '';
+    featuredProduct.hidden = true;
+    return;
+  }
+  featuredProduct.hidden = false;
+  featuredProduct.innerHTML = `
+    <div>
+      <span>Último produto adicionado</span>
+      <strong>${escapeHtml(cleanName(product.name))}</strong>
+      <p>${money.format(product.price)} • ${product.stock} disponível${product.stock === 1 ? '' : 'is'}</p>
+    </div>
+    <img src="${escapeHtml(imageFor(product))}" alt="${escapeHtml(cleanName(product.name))}" loading="lazy" onerror="this.onerror=null;this.src='${defaultProductImage}'">
+    <button class="featured-add" type="button" data-add="${escapeHtml(product.name)}" aria-label="Adicionar destaque">+</button>`;
 }
 
 function escapeHtml(value) {
@@ -104,34 +127,35 @@ function showToast(text) {
 }
 
 function renderTelegramUser() {
-  if (!tgUser?.id) return;
-  const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ').trim();
+  if (!currentUserId) return;
+  const fullName = [tgUser?.first_name, tgUser?.last_name].filter(Boolean).join(' ').trim();
   userName.textContent = fullName || 'Cliente Ramon Store';
-  userUsername.textContent = tgUser.username ? `@${tgUser.username}` : 'Perfil do Telegram';
-  userId.textContent = tgUser.id;
-  if (tgUser.photo_url) {
+  userUsername.textContent = tgUser?.username ? `@${tgUser.username}` : 'Perfil do Telegram';
+  userId.textContent = currentUserId;
+  if (tgUser?.photo_url) {
     userAvatar.src = tgUser.photo_url;
-    userCover.style.backgroundImage = `linear-gradient(135deg, rgba(14, 165, 233, .22), rgba(3, 26, 68, .78)), url("${tgUser.photo_url}")`;
+    userCover.style.backgroundImage = `linear-gradient(135deg, rgba(21, 193, 187, .18), rgba(4, 32, 35, .88)), url("${tgUser.photo_url}")`;
   }
 }
 
 function loadUserBalance() {
-  if (!tgUser?.id) return;
-  fetch(`/api/user?id=${encodeURIComponent(tgUser.id)}&v=${Date.now()}`, { cache: 'no-store' })
+  if (!currentUserId) return;
+  fetch(`/api/user?id=${encodeURIComponent(currentUserId)}&v=${Date.now()}`, { cache: 'no-store' })
     .then((response) => {
       if (!response.ok) throw new Error('Falha ao carregar usuário');
       return response.json();
     })
     .then((profile) => {
       userBalance.textContent = money.format(Number(profile.saldo || 0));
-      if (profile.username && !tgUser.username) userUsername.textContent = `@${profile.username}`;
+      if (profile.username && !tgUser?.username) userUsername.textContent = `@${profile.username}`;
+      if (profile.id) userId.textContent = profile.id;
     })
     .catch(() => {
       userBalance.textContent = 'Saldo indisponível';
     });
 }
 
-list.addEventListener('click', (event) => {
+document.addEventListener('click', (event) => {
   const button = event.target.closest('[data-add]');
   if (!button) return;
   const product = state.products.find((item) => item.name === button.dataset.add);
@@ -166,6 +190,7 @@ document.querySelector('#segments').addEventListener('click', (event) => {
   renderProducts();
 });
 document.querySelector('#cartButton').addEventListener('click', () => showCart(true));
+document.querySelector('#cartButtonHero').addEventListener('click', () => showCart(true));
 document.querySelector('#closeCart').addEventListener('click', () => showCart(false));
 document.querySelector('#closeCartIcon').addEventListener('click', () => showCart(false));
 checkout.addEventListener('click', () => {
@@ -199,6 +224,7 @@ fetch(`catalog.json?v=${Date.now()}`, { cache: 'no-store' })
   })
   .then((products) => {
     state.products = products;
+    renderFeaturedProduct();
     renderProducts();
     updateCart();
   })
