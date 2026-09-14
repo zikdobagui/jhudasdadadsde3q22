@@ -54,6 +54,26 @@ def _save_json(path, data):
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
+def _sanitize_child_runtime(runtime_path, reset_customer_data=False):
+    """Remove dados privados copiados do projeto antes de ligar um bot filho."""
+    database_dir = os.path.join(runtime_path, "database")
+    os.makedirs(database_dir, exist_ok=True)
+    _save_json(os.path.join(database_dir, "acessos.json"), {"acessos": []})
+    _save_json(os.path.join(database_dir, "login_registry.json"), {"contas": {}})
+    _save_json(os.path.join(database_dir, "reserve_verified.json"), {})
+
+    if reset_customer_data:
+        users_dir = os.path.join(database_dir, "users")
+        if os.path.isdir(users_dir):
+            shutil.rmtree(users_dir)
+        os.makedirs(users_dir, exist_ok=True)
+
+        history_dir = os.path.join(runtime_path, "historicos")
+        if os.path.isdir(history_dir):
+            shutil.rmtree(history_dir)
+        os.makedirs(history_dir, exist_ok=True)
+
+
 def _pid_file(runtime_path):
     return os.path.join(runtime_path, ".trial.pid")
 
@@ -114,6 +134,7 @@ def start_trial_bot(trial, on_expire=None, rebuild_runtime=True):
     runtime_path = os.path.join(RUNTIME_DIR, f"trial-{trial['id']}")
     _terminate_pid(_read_pid(runtime_path))
 
+    runtime_created = rebuild_runtime or not os.path.exists(runtime_path)
     if rebuild_runtime:
         if os.path.exists(runtime_path):
             shutil.rmtree(runtime_path)
@@ -121,6 +142,7 @@ def start_trial_bot(trial, on_expire=None, rebuild_runtime=True):
     elif not os.path.exists(runtime_path):
         shutil.copytree(PROJECT_DIR, runtime_path, ignore=_ignore_runtime_files)
 
+    _sanitize_child_runtime(runtime_path, reset_customer_data=runtime_created)
     _prepare_child_credentials(runtime_path, trial)
 
     process = subprocess.Popen(

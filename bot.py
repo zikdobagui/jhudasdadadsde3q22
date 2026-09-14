@@ -2684,6 +2684,7 @@ def configuracoes_geral(message):
     markup.row(InlineKeyboardButton('â€¢ Alterar Suporte', callback_data='suporte'),
                InlineKeyboardButton('âš™ï¸ Alterar Separador', callback_data='mudar_separador'))
     markup.row(InlineKeyboardButton('â€¢ Modo de ExibiÃ§Ã£o', callback_data='configurar_modo_exibicao'))
+    markup.row(InlineKeyboardButton('🌐 API DE ESTOQUE', callback_data='configurar_api_estoque'))
     markup.row(InlineKeyboardButton('âœ… Voltar', callback_data='voltar_paineladm'))
     
     bot.edit_message_text(
@@ -2818,6 +2819,94 @@ def texto_tarefas_premios(user_id):
         f"{'✅' if fez_compra else '❌'} Fazer pelo menos 1 compra no dia.\n"
         f"{'✅' if fez_recarga else '❌'} Fazer pelo menos 1 recarga no dia."
     )
+
+
+def _credenciais_api_estoque():
+    path = os.path.join('settings', 'credenciais.json')
+    with open(path, 'r', encoding='utf-8-sig') as file:
+        data = json.load(file)
+    return path, data
+
+
+def _salvar_credenciais_api_estoque(**changes):
+    path, data = _credenciais_api_estoque()
+    data.update(changes)
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump(data, file, ensure_ascii=False, indent=4)
+
+
+def menu_api_estoque(message):
+    _, data = _credenciais_api_estoque()
+    url = str(data.get('central_stock_api_url', '')).strip().rstrip('/')
+    key = str(data.get('central_stock_api_key', '')).strip()
+    status = '🟢 Conectada' if url and key else '🔴 Não configurada'
+    masked_key = f'{key[:4]}••••{key[-4:]}' if len(key) >= 10 else ('••••••••' if key else 'Não informada')
+    texto = (
+        '🌐 <b>API DE ESTOQUE CENTRAL</b>\n\n'
+        f'<b>Status:</b> {status}\n'
+        f'<b>URL:</b> <code>{html.escape(url or "Não informada")}</code>\n'
+        f'<b>Chave:</b> <code>{html.escape(masked_key)}</code>\n\n'
+        'O bot consulta produtos e reserva acessos diretamente no servidor central. '
+        '<b>Nenhum login fica armazenado neste bot filho.</b>'
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('[cor:azul] 🔗 CONFIGURAR API', callback_data='alterar_api_estoque_url'))
+    markup.row(InlineKeyboardButton('🧪 TESTAR CONEXÃO', callback_data='testar_api_estoque'))
+    markup.row(InlineKeyboardButton('↩️ CONFIGURAÇÕES GERAIS', callback_data='configuracoes_geral'))
+    safe_edit_message(message, texto, reply_markup=markup)
+
+
+def receber_api_estoque_url(message):
+    if not is_owner_or_admin(message.from_user.id):
+        return
+    url = str(message.text or '').strip().rstrip('/')
+    if not re.match(r'^https?://[^\s]+$', url, flags=re.IGNORECASE):
+        bot.reply_to(message, '❌ URL inválida. Envie começando com http:// ou https://.')
+        return
+    _salvar_credenciais_api_estoque(central_stock_api_url=url)
+    prompt = bot.send_message(
+        message.chat.id,
+        '🔐 <b>Agora envie a chave da API central.</b>\n\nEla será armazenada de forma privada e aparecerá mascarada no painel.',
+        parse_mode='HTML',
+        reply_markup=types.ForceReply()
+    )
+    bot.register_next_step_handler(prompt, receber_api_estoque_chave)
+
+
+def receber_api_estoque_chave(message):
+    if not is_owner_or_admin(message.from_user.id):
+        return
+    key = str(message.text or '').strip()
+    if len(key) < 8 or len(key) > 200:
+        bot.reply_to(message, '❌ Chave inválida. Ela deve possuir entre 8 e 200 caracteres.')
+        return
+    _salvar_credenciais_api_estoque(central_stock_api_key=key)
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except Exception:
+        pass
+    bot.send_message(
+        message.chat.id,
+        '✅ <b>API configurada com sucesso.</b>\n\nUse “Testar conexão” para validar o acesso ao estoque central.',
+        parse_mode='HTML'
+    )
+
+
+def testar_api_estoque(call):
+    _, data = _credenciais_api_estoque()
+    url = str(data.get('central_stock_api_url', '')).strip().rstrip('/')
+    key = str(data.get('central_stock_api_key', '')).strip()
+    if not url or not key:
+        bot.answer_callback_query(call.id, 'Configure a URL e a chave primeiro.', show_alert=True)
+        return
+    try:
+        response = requests.get(f'{url}/api/stock', headers={'X-Stock-Key': key}, timeout=12)
+        response.raise_for_status()
+        stock = response.json().get('stock', [])
+        total = sum(int(item.get('stock', item.get('quantidade', 0)) or 0) for item in stock)
+        bot.answer_callback_query(call.id, f'Conexão aprovada: {len(stock)} produtos e {total} acessos.', show_alert=True)
+    except Exception as error:
+        bot.answer_callback_query(call.id, f'Falha na conexão: {str(error)[:120]}', show_alert=True)
 
 def servicos_unicos_disponiveis():
     servicos = []
@@ -10598,6 +10687,32 @@ def callback_query(call):
         os._exit(0)
     if call.data == 'configuracoes_geral':
         configuracoes_geral(call.message)
+    if call.data == 'configurar_api_estoque':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        menu_api_estoque(call.message)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data == 'alterar_api_estoque_url':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        prompt = bot.send_message(
+            call.message.chat.id,
+            '🔗 <b>Envie a URL da API de estoque central.</b>\n\nExemplo: <code>https://api.sualoja.com</code>',
+            parse_mode='HTML',
+            reply_markup=types.ForceReply()
+        )
+        bot.register_next_step_handler(prompt, receber_api_estoque_url)
+        bot.answer_callback_query(call.id)
+        return
+    if call.data == 'testar_api_estoque':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
+        testar_api_estoque(call)
+        return
     if call.data == 'manutencao':
         api.CredentialsChange.mudar_status_manutencao()
         bot.answer_callback_query(call.id, "Status de manutenÃ§Ã£o atualizado com sucesso!", show_alert=True)
