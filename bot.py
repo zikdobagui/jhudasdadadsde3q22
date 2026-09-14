@@ -215,7 +215,6 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
 MINIAPP_URL = "https://vendasdoramon.squareweb.app/"
-START_IMAGE_URL = "https://xatimg.com/image/EwxrOZ5Tzf1q.png"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')
@@ -7141,26 +7140,15 @@ def handle_start(message):
             chat_id=message.chat.id,
             message_id=message.message_id,
             text=texto,
-            reply_markup=markup,
-            disable_web_page_preview=True
+            reply_markup=markup
         )
         return
 
-    try:
-        bot.send_photo(
-            chat_id=message.chat.id,
-            photo=START_IMAGE_URL,
-            caption=texto,
-            parse_mode='HTML',
-            reply_markup=markup
-        )
-    except Exception:
-        send_html_or_plain(
-            chat_id=message.chat.id,
-            text=texto,
-            reply_markup=markup,
-            disable_web_page_preview=True
-        )
+    send_html_or_plain(
+        chat_id=message.chat.id,
+        text=texto,
+        reply_markup=markup
+    )
 
 def perfil(call):
     message = call.message
