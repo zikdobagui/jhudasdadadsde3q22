@@ -97,19 +97,37 @@ def _write_pid(runtime_path, pid):
 
 def _terminate_pid(pid):
     if not pid:
-        return
+        return False
     try:
         if os.name == "nt":
+            # O Python da Microsoft Store usa um processo intermediario. Mesmo
+            # depois que ele encerra, os filhos preservam ParentProcessId.
+            root_pid = int(pid)
+            script = (
+                f"$rootPid={root_pid};"
+                "$all=@(Get-CimInstance Win32_Process);"
+                "$targets=New-Object System.Collections.Generic.List[int];"
+                "$queue=New-Object System.Collections.Generic.Queue[int];"
+                "$queue.Enqueue($rootPid);"
+                "while($queue.Count -gt 0){$parent=$queue.Dequeue();"
+                "foreach($child in $all|Where-Object{$_.ParentProcessId -eq $parent}){"
+                "$childPid=[int]$child.ProcessId;"
+                "if(-not $targets.Contains($childPid)){$targets.Add($childPid);$queue.Enqueue($childPid)}}};"
+                "$targets.Reverse();"
+                "foreach($targetPid in $targets){Stop-Process -Id $targetPid -Force -ErrorAction SilentlyContinue};"
+                "Stop-Process -Id $rootPid -Force -ErrorAction SilentlyContinue"
+            )
             subprocess.run(
-                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=False,
             )
         else:
             os.kill(pid, signal.SIGTERM)
+        return True
     except Exception:
-        pass
+        return False
 
 
 def _prepare_child_credentials(runtime_path, trial):
@@ -191,7 +209,10 @@ def stop_trial_bot(trial_id, reason="stopped", on_expire=None):
         timer.cancel()
 
     process = runtime.get("process")
-    if process and process.poll() is None:
+    recorded_pid = _read_pid(runtime.get("runtime_path", ""))
+    if os.name == "nt":
+        _terminate_pid(recorded_pid or getattr(process, "pid", None))
+    elif process and process.poll() is None:
         try:
             process.terminate()
             process.wait(timeout=10)
@@ -200,7 +221,8 @@ def stop_trial_bot(trial_id, reason="stopped", on_expire=None):
                 process.kill()
             except Exception:
                 pass
-    _terminate_pid(_read_pid(runtime.get("runtime_path", "")))
+    else:
+        _terminate_pid(recorded_pid)
 
     if on_expire:
         on_expire(trial_id, reason, runtime)
