@@ -12,7 +12,7 @@ NÃO expõe email/senha — só nome, preço, estoque e imagem.
 """
 
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from collections import defaultdict, deque
 import hmac
 import json
@@ -146,6 +146,24 @@ def _clean_text(value, max_length=MAX_FIELD_LENGTH):
     if len(text) > max_length:
         text = text[:max_length]
     return text.replace('\x00', '')
+
+
+def _public_user_profile(user_id):
+    user_id = _clean_text(user_id, 32)
+    if not user_id.isdigit():
+        return None
+    user_data = database.load_user_data(user_id)
+    if not isinstance(user_data, dict):
+        return {
+            'id': user_id,
+            'username': '',
+            'saldo': 0,
+        }
+    return {
+        'id': str(user_data.get('id', user_id)),
+        'username': _clean_text(user_data.get('username', ''), 64).lstrip('@'),
+        'saldo': round(float(user_data.get('saldo', 0) or 0), 2),
+    }
 
 
 def _public_error(reason):
@@ -324,7 +342,8 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=MINIAPP_DIR, **kwargs)
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
         if _rate_limited(_client_ip(self), 'get'):
             self._responder_json(429, {'error': 'rate_limited'})
             return
@@ -338,6 +357,15 @@ class Handler(SimpleHTTPRequestHandler):
                 self._responder_json(401, {'error': 'unauthorized'})
                 return
             self._responder_json(200, {'stock': gerar_catalogo()})
+            return
+
+        if path == '/api/user':
+            user_id = parse_qs(parsed_url.query).get('id', [''])[0]
+            profile = _public_user_profile(user_id)
+            if profile is None:
+                self._responder_json(400, {'error': 'invalid_user'})
+                return
+            self._responder_json(200, profile)
             return
 
         if path == '/health':

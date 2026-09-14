@@ -12,11 +12,18 @@ const cartItems = document.querySelector('#cartItems');
 const cartTotal = document.querySelector('#cartTotal');
 const checkout = document.querySelector('#checkoutButton');
 const toast = document.querySelector('#toast');
+const userName = document.querySelector('#userName');
+const userUsername = document.querySelector('#userUsername');
+const userAvatar = document.querySelector('#userAvatar');
+const userCover = document.querySelector('#userCover');
+const userBalance = document.querySelector('#userBalance');
+const userId = document.querySelector('#userId');
+const tgUser = tg?.initDataUnsafe?.user;
 
 tg?.ready();
 tg?.expand();
-tg?.setHeaderColor?.('#080b10');
-tg?.setBackgroundColor?.('#080b10');
+tg?.setHeaderColor?.('#031a44');
+tg?.setBackgroundColor?.('#031a44');
 
 function category(name) {
   const value = name.toLocaleLowerCase('pt-BR');
@@ -96,6 +103,34 @@ function showToast(text) {
   window.setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
+function renderTelegramUser() {
+  if (!tgUser?.id) return;
+  const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ').trim();
+  userName.textContent = fullName || 'Cliente Ramon Store';
+  userUsername.textContent = tgUser.username ? `@${tgUser.username}` : 'Perfil do Telegram';
+  userId.textContent = tgUser.id;
+  if (tgUser.photo_url) {
+    userAvatar.src = tgUser.photo_url;
+    userCover.style.backgroundImage = `linear-gradient(135deg, rgba(14, 165, 233, .22), rgba(3, 26, 68, .78)), url("${tgUser.photo_url}")`;
+  }
+}
+
+function loadUserBalance() {
+  if (!tgUser?.id) return;
+  fetch(`/api/user?id=${encodeURIComponent(tgUser.id)}&v=${Date.now()}`, { cache: 'no-store' })
+    .then((response) => {
+      if (!response.ok) throw new Error('Falha ao carregar usuário');
+      return response.json();
+    })
+    .then((profile) => {
+      userBalance.textContent = money.format(Number(profile.saldo || 0));
+      if (profile.username && !tgUser.username) userUsername.textContent = `@${profile.username}`;
+    })
+    .catch(() => {
+      userBalance.textContent = 'Saldo indisponível';
+    });
+}
+
 list.addEventListener('click', (event) => {
   const button = event.target.closest('[data-add]');
   if (!button) return;
@@ -150,7 +185,7 @@ checkout.addEventListener('click', () => {
   const link = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
   checkout.disabled = true;
   checkout.textContent = 'Abrindo pagamento no bot...';
-  tg.HapticFeedback?.notificationOccurred('success');
+  tg?.HapticFeedback?.notificationOccurred('success');
   if (tg?.openTelegramLink) tg.openTelegramLink(link);
   else window.location.href = link;
   window.setTimeout(() => tg?.close?.(), 500);
@@ -168,3 +203,6 @@ fetch(`catalog.json?v=${Date.now()}`, { cache: 'no-store' })
     updateCart();
   })
   .catch(() => { list.innerHTML = '<div class="empty">Não foi possível carregar o catálogo.</div>'; });
+
+renderTelegramUser();
+loadUserBalance();
