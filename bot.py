@@ -5841,6 +5841,66 @@ def get_current_bot_username():
     return _current_bot_username
 
 
+def _imagem_produto_para_envio(nome):
+    configured = _miniapp_image_for_service(nome)
+    if configured:
+        if configured.startswith(('http://', 'https://')):
+            return configured
+        relative = configured.replace('/', os.sep).lstrip('\\/')
+        local_path = os.path.join(BASE_DIR, 'miniapp', relative)
+        if os.path.isfile(local_path):
+            return local_path
+    icon_path = _find_icon_for_service(nome)
+    if icon_path and os.path.isfile(icon_path):
+        return icon_path
+    return None
+
+
+def enviar_venda_canal(user_id, nome, valor, horario):
+    nome_limpo = html.escape(str(nome))
+    try:
+        valor_texto = f'{float(valor):.2f}'.replace('.', ',')
+    except (TypeError, ValueError):
+        valor_texto = html.escape(str(valor))
+    texto = (
+        '🛍️ <b>NOVA COMPRA REALIZADA</b>\n\n'
+        f'📦 <b>Produto:</b> {nome_limpo}\n'
+        f'💰 <b>Valor:</b> R$ {valor_texto}\n'
+        f'🆔 <b>Cliente:</b> <code>{html.escape(str(user_id))}</code>\n'
+        f'🕒 <b>Horário:</b> {html.escape(str(horario))}\n\n'
+        '⚡ <i>Entrega automática, rápida e segura.</i>'
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton('[cor:azul] 🛒 COMPRAR NO BOT', url=f'https://t.me/{get_current_bot_username()}'))
+    image = _imagem_produto_para_envio(nome)
+    try:
+        if image and os.path.isfile(str(image)):
+            with open(image, 'rb') as photo:
+                return bot.send_photo(
+                    get_sales_notification_chat_id(),
+                    photo,
+                    caption=texto,
+                    parse_mode='HTML',
+                    reply_markup=markup
+                )
+        if image:
+            return bot.send_photo(
+                get_sales_notification_chat_id(),
+                image,
+                caption=texto,
+                parse_mode='HTML',
+                reply_markup=markup
+            )
+    except Exception as error:
+        print(f'[VENDAS] Falha ao enviar imagem de {nome}: {error}', flush=True)
+    return bot.send_message(
+        get_sales_notification_chat_id(),
+        texto,
+        parse_mode='HTML',
+        reply_markup=markup
+    )
+
+
 def sync_telegram_username(user):
     username = str(getattr(user, 'username', '') or '').strip().lstrip('@')
     user_data = database.load_user_data(user.id)
@@ -7871,7 +7931,7 @@ def entregar_carrinho(message, nome, valor, email, senha, descricao, duracao):
         f"â€¢ HorÃ©rio: {horario_brasil}"
     )
     try:
-        bot.send_message(get_sales_notification_chat_id(), sale_message, parse_mode='HTML')
+        enviar_venda_canal(message.chat.id, nome, valor, horario_brasil)
     except:
         pass
 
@@ -8193,7 +8253,7 @@ def entregar(message, nome, valor, email, senha, descricao, duracao):
         f"â€¢ HorÃ©rio: {horario_brasil}"
     )
     try:
-        bot.send_message(get_sales_notification_chat_id(), sale_message, parse_mode='HTML')
+        enviar_venda_canal(message.chat.id, nome, valor, horario_brasil)
     except:
         pass
 
@@ -8907,7 +8967,7 @@ def entregar_inline_mesmo_formato(user_id, nome, valor, email, senha, descricao,
         f"â€¢ HorÃ©rio: {horario_brasil}"
     )
     try:
-        bot.send_message(get_sales_notification_chat_id(), sale_message, parse_mode='HTML')
+        enviar_venda_canal(user_id, nome, valor, horario_brasil)
     except Exception as e:
         print(f"Erro ao enviar mensagem de venda: {e}")
 
@@ -8975,7 +9035,7 @@ def entregar_inline(user_id, nome, valor, email, senha, descricao, duracao):
         f"â€¢ HorÃ©rio: {horario_brasil}"
     )
     try:
-        bot.send_message(get_sales_notification_chat_id(), sale_msg, parse_mode='HTML')
+        enviar_venda_canal(user_id, nome, valor, horario_brasil)
     except Exception as e:
         print(f"Erro ao enviar mensagem de venda no grupo: {e}")
 
