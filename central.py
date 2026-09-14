@@ -1228,7 +1228,14 @@ class ControleLogins():
 
     @classmethod
     def usando_estoque_central(cls):
-        return cls._remote_config() is not None
+        if cls._remote_config() is not None:
+            return True
+        try:
+            with open_utf8('settings/credenciais.json', 'r') as f:
+                data = json.load(f)
+            return data.get('child_api_only') is True
+        except Exception:
+            return False
 
     @classmethod
     def _remote_headers(cls, config):
@@ -1241,7 +1248,7 @@ class ControleLogins():
     def _remote_get_stock(cls):
         config = cls._remote_config()
         if not config:
-            return None
+            return []
         response = requests.get(
             f"{config['url']}/api/stock",
             headers={'X-Stock-Key': config['key']},
@@ -1275,7 +1282,7 @@ class ControleLogins():
     def _remote_add(cls, nome, valor, descricao, email, senha, duracao):
         config = cls._remote_config()
         if not config:
-            return None
+            return False
         payload = {
             'nome': nome,
             'valor': valor,

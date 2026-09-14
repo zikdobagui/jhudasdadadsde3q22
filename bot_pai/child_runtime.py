@@ -40,6 +40,8 @@ def _ignore_runtime_files(directory, names):
         "sync_log.txt.3",
         "casino.log",
     }
+    if os.path.normcase(os.path.abspath(directory)) == os.path.normcase(os.path.join(PROJECT_DIR, "database")):
+        ignored.add("acessos.json")
     return {name for name in names if name in ignored or name.endswith(".zip")}
 
 
@@ -58,7 +60,9 @@ def _sanitize_child_runtime(runtime_path, reset_customer_data=False):
     """Remove dados privados copiados do projeto antes de ligar um bot filho."""
     database_dir = os.path.join(runtime_path, "database")
     os.makedirs(database_dir, exist_ok=True)
-    _save_json(os.path.join(database_dir, "acessos.json"), {"acessos": []})
+    accesses_path = os.path.join(database_dir, "acessos.json")
+    if os.path.isfile(accesses_path):
+        os.remove(accesses_path)
     _save_json(os.path.join(database_dir, "login_registry.json"), {"contas": {}})
     _save_json(os.path.join(database_dir, "reserve_verified.json"), {})
 
@@ -116,8 +120,9 @@ def _prepare_child_credentials(runtime_path, trial):
     credentials["user_bot"] = trial.get("username", "")
     support_url = trial.get("support_url") or "https://t.me/RamonSuporteV"
     credentials["link_suporte"] = support_url
-    credentials["central_stock_api_url"] = trial["central_stock_api_url"]
-    credentials["central_stock_api_key"] = trial["central_stock_api_key"]
+    credentials["central_stock_api_url"] = ""
+    credentials["central_stock_api_key"] = ""
+    credentials["child_api_only"] = True
     credentials["child_bot_id"] = f"trial-{trial['id']}"
     credentials["reseller_admin_id"] = str(trial["admin_id"])
     # O prazo real do teste e controlado pelo timer do bot pai.
@@ -223,7 +228,7 @@ def build_trial(data, config, request_id):
         "status": "trial_running",
         "created_at": now,
         "expires_at": now + timedelta(minutes=minutes),
-        "central_stock_api_url": config.get("central_stock_api_url") or "https://vendasdoramon.squareweb.app",
-        "central_stock_api_key": config.get("central_stock_api_key") or config.get("stock_api_key", ""),
+        "central_stock_api_url": "",
+        "central_stock_api_key": "",
         "support_url": config.get("support_url") or "https://t.me/RamonSuporteV",
     }

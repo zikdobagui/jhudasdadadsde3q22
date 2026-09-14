@@ -15,6 +15,7 @@
   "stock_api_key": "COLOQUE_UMA_CHAVE_FORTE_PARA_BOTS_FILHOS",
   "central_stock_api_url": "",
   "central_stock_api_key": "",
+  "child_api_only": false,
   "child_bot_id": "",
   "reseller_admin_id": "",
   "reseller_billing_enabled": true,
