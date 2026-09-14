@@ -215,7 +215,7 @@ A CONTA DEU PROBLEMA? NÃƒO ESTOU NO HORÃRIO DE ATENDIMENTO OS DIAS VÃƒO S
 REQUIRED_GROUP_ID = -1002573223312
 JOIN_GROUP_LINK = "https://t.me/ramonstorebottt"
 MINIAPP_URL = "https://vendasdoramon.squareweb.app/"
-START_IMAGE_URL = "https://i.ibb.co/J4NKTnw/IMG-8242.png"
+START_IMAGE_URL = "https://xatimg.com/image/EwxrOZ5Tzf1q.png"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MINIAPP_IMAGES_FILE = os.path.join(BASE_DIR, 'database', 'miniapp_images.json')
 MINIAPP_CATALOG_FILE = os.path.join(BASE_DIR, 'miniapp', 'catalog.json')
