@@ -5945,8 +5945,7 @@ def gerar_menu_principal(user_id=None):
     bt_perfil = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('menu_perfil', 'MEU PERFIL'), callback_data='perfil'), 'perfil')
     bt_suporte = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('menu_suporte', 'SUPORTE'), url=api.CredentialsChange.SuporteInfo.link_suporte()), 'suporte')
     bt_estoque = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('estoque_disponivel', 'ESTOQUE DISPONÃVEL'), callback_data='ver_estoque'), 'estoque')
-    bt_grupo_telegram = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupo_telegram', 'GRUPO TELEGRAM'), url=JOIN_GROUP_LINK), 'telegram')
-    bt_grupo_whatsapp = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupo_whatsapp', 'GRUPO WHATSAPP'), url=api.CredentialsChange.SuporteInfo.link_suporte()), 'whatsapp')
+    bt_grupos = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupos', 'GRUPOS'), callback_data='menu_grupos'), 'telegram')
     # bt_alugar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('menu_alugar_servidor', 'ALUGAR SERVIDOR'), callback_data='alugar_bot'), 'alugar')
     bt_carrinho = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('carrinho', 'CARRINHO'), callback_data='ver_carrinho'), 'carrinho')
     bt_historico = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data='baixar_historico_self')
@@ -5963,8 +5962,7 @@ def gerar_menu_principal(user_id=None):
     markup.row(bt_perfil, bt_suporte)
     markup.add(bt_jogos)
     # markup.add(bt_filmes)
-    markup.row(bt_estoque, bt_grupo_telegram)
-    markup.add(bt_grupo_whatsapp)
+    markup.row(bt_estoque, bt_grupos)
     markup.row(bt_carrinho, bt_historico)
     markup.add(bt_notificar)
     markup.add(bt_indique)
@@ -5974,6 +5972,20 @@ def gerar_menu_principal(user_id=None):
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
 
+    return markup
+
+
+def gerar_menu_grupos():
+    markup = InlineKeyboardMarkup(row_width=1)
+    bt_bot_reserva = InlineKeyboardButton('🛡️ BOT RESERVA', url=reserve_bot_url())
+    bt_grupo_telegram = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupo_telegram', 'GRUPO TELEGRAM'), url=JOIN_GROUP_LINK), 'telegram')
+    bt_grupo_whatsapp = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupo_whatsapp', 'GRUPO WHATSAPP'), url=api.CredentialsChange.SuporteInfo.link_suporte()), 'whatsapp')
+    bt_voltar = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
+
+    markup.add(bt_bot_reserva)
+    markup.add(bt_grupo_telegram)
+    markup.add(bt_grupo_whatsapp)
+    markup.add(bt_voltar)
     return markup
 
 def markup_inatividade_cliente(terms_callback='termos_inatividade', user_id=None):
@@ -10508,6 +10520,19 @@ def callback_query(call):
             reply_markup=markup,
             disable_web_page_preview=True
         )
+        return
+
+    if call.data == 'menu_grupos':
+        markup = gerar_menu_grupos()
+        bot.edit_message_text(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            text='👥 <b>GRUPOS</b>\n\nEscolha abaixo onde deseja entrar:',
+            parse_mode='HTML',
+            reply_markup=markup,
+            disable_web_page_preview=True
+        )
+        bot.answer_callback_query(call.id)
         return
 
     if call.data == 'roleta_sorte':
