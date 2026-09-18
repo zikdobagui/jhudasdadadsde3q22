@@ -8,6 +8,7 @@ Este script pode ser executado manualmente ou agendado para rodar periodicamente
 """
 
 import json
+import hashlib
 import os
 import time
 import sys
@@ -134,6 +135,7 @@ def atualizar_catalogo():
             nome = acesso['nome']
             if nome not in agrupados:
                 agrupados[nome] = {
+                    'id': hashlib.sha1(str(nome).strip().casefold().encode('utf-8')).hexdigest()[:16],
                     'name': nome,
                     'price': float(acesso['valor']),
                     'stock': 0

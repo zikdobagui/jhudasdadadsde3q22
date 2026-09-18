@@ -285,6 +285,7 @@ def gerar_catalogo():
         valor = float(acesso.get('valor', 0))
         if nome not in agrupados:
             agrupados[nome] = {
+                'id': hashlib.sha1(nome.casefold().encode('utf-8')).hexdigest()[:16],
                 'name': nome,
                 'price': valor,
                 'stock': 0,
