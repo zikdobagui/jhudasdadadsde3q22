@@ -5957,6 +5957,7 @@ def gerar_menu_principal(user_id=None):
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
+    markup.add(InlineKeyboardButton('📩 RECEBER CÓDIGO', callback_data='receber_codigos:0'))
     markup.add(bt_comprar)
     markup.add(bt_addsaldo)
     markup.row(bt_perfil, bt_suporte)
@@ -5973,6 +5974,68 @@ def gerar_menu_principal(user_id=None):
     markup.add(bt_pesquisar)
 
     return markup
+
+
+@bot.callback_query_handler(func=lambda c: bool(c.data) and c.data.startswith('receber_codigos:'))
+def menu_receber_codigos(call):
+    from purchase_codes import TZ, active_purchases
+
+    if call.message.chat.type != 'private':
+        bot.answer_callback_query(call.id, 'Consulte suas compras no privado do bot.', show_alert=True)
+        return
+    try:
+        page = max(0, int(call.data.split(':')[1]))
+    except (ValueError, IndexError):
+        page = 0
+    compras = (api.load_user_data(call.from_user.id) or {}).get('compras', [])
+    ativas = active_purchases(compras)
+    page = min(page, max(0, (len(ativas) - 1) // 8))
+    markup = InlineKeyboardMarkup(row_width=1)
+    for index, compra, validade in ativas[page * 8:(page + 1) * 8]:
+        label = f"{compra['servico']} — {compra['email']}"
+        markup.add(InlineKeyboardButton(label[:100], callback_data=f'codigo_compra:{index}'))
+    if page:
+        markup.add(InlineKeyboardButton('⬅️ Anteriores', callback_data=f'receber_codigos:{page - 1}'))
+    if (page + 1) * 8 < len(ativas):
+        markup.add(InlineKeyboardButton('Próximas ➡️', callback_data=f'receber_codigos:{page + 1}'))
+    markup.add(InlineKeyboardButton('Voltar ao início', callback_data='menu_start'))
+    texto = '📩 <b>RECEBER CÓDIGO</b>\n\n'
+    if ativas:
+        texto += 'Selecione uma compra dentro do prazo de validade.\n\nA consulta automática de e-mails ainda não está disponível. Para receber o código, fale com o suporte.'
+    else:
+        texto += 'Você não tem compras com validade confirmada em aberto. Compras antigas sem prazo registrado precisam ser verificadas pelo suporte.'
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda c: bool(c.data) and c.data.startswith('codigo_compra:'))
+def receber_codigo_compra(call):
+    from purchase_codes import TZ, active_purchases
+
+    if call.message.chat.type != 'private':
+        bot.answer_callback_query(call.id, 'Consulte suas compras no privado do bot.', show_alert=True)
+        return
+    compras = (api.load_user_data(call.from_user.id) or {}).get('compras', [])
+    try:
+        index = int(call.data.split(':')[1])
+    except (ValueError, IndexError):
+        index = -1
+    compra = next((item for item in active_purchases(compras) if item[0] == index), None)
+    if compra is None:
+        bot.answer_callback_query(call.id, 'Compra indisponível ou fora da validade.', show_alert=True)
+        return
+    _, dados, validade = compra
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton('📩 Solicitar código ao suporte', url=api.CredentialsChange.SuporteInfo.link_suporte()))
+    markup.add(InlineKeyboardButton('Voltar às compras', callback_data='receber_codigos:0'))
+    texto = (
+        f"📩 <b>{html.escape(str(dados['servico']))}</b>\n"
+        f"E-mail: <code>{html.escape(str(dados['email']))}</code>\n"
+        f"Validade: {validade.astimezone(TZ).strftime('%d/%m/%Y %H:%M')}\n\n"
+        'A consulta automática de e-mails ainda não está disponível. Solicite o código ao suporte informando esta compra.'
+    )
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
 
 
 def gerar_menu_grupos():
@@ -7927,7 +7990,7 @@ def entregar_carrinho(message, nome, valor, email, senha, descricao, duracao):
     texto = texto.replace('{data_vencimento}', data_vencimento_formatada)
 
     # Adicionar ao histÃ©rico
-    api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha)
+    api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha, duracao)
     aplicar_cashback_vip(message.chat.id, valor)
 
     # Enviar login para o cliente
@@ -8233,7 +8296,7 @@ def entregar(message, nome, valor, email, senha, descricao, duracao):
     texto = texto.replace('{data_vencimento}', data_vencimento_formatada)
 
    
-    api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha)
+    api.MudancaHistorico.add_compra(message.chat.id, nome, valor, email, senha, duracao)
     aplicar_cashback_vip(message.chat.id, valor)
 
  
@@ -8964,7 +9027,7 @@ def entregar_inline_mesmo_formato(user_id, nome, valor, email, senha, descricao,
     )
 
     
-    api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha)
+    api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha, duracao)
     aplicar_cashback_vip(user_id, valor)
 
    
@@ -9028,7 +9091,7 @@ def entregar_inline(user_id, nome, valor, email, senha, descricao, duracao):
     bot.send_message(chat_id=user_id, text=texto_entrega, parse_mode='HTML')
 
      
-    api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha)
+    api.MudancaHistorico.add_compra(user_id, nome, valor, email, senha, duracao)
     aplicar_cashback_vip(user_id, valor)
 
    

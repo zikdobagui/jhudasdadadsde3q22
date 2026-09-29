@@ -840,11 +840,20 @@ class MudancaHistorico():
                     json.dump(data, f, indent=4)
                 break
             pass
-    def add_compra(id, servico, valor, email, senha):
+    def add_compra(id, servico, valor, email, senha, duracao=None):
         user_data = load_user_data(id)
         if user_data:
+            validade = {}
+            if duracao is not None:
+                dias = int(duracao)
+                agora = datetime.datetime.now(pytz.timezone('America/Sao_Paulo'))
+                validade = {
+                    "duracao": dias,
+                    "expira_em": (agora + datetime.timedelta(days=dias)).isoformat(),
+                }
             user_data["total_compras"] += 1
             user_data["compras"].append({
+                **validade,
                 "servico": servico,
                 "valor": valor,
                 "email": email,
