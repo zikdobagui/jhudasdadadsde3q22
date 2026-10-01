@@ -5971,7 +5971,7 @@ def gerar_menu_principal(user_id=None):
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
-    markup.add(InlineKeyboardButton('📩 RECEBER CÓDIGO', callback_data='receber_codigos:0'))
+    markup.add(InlineKeyboardButton('📩 RECEBER CÓDIGO', url='https://t.me/ramoncodigo_bot'))
 
     return markup
 
