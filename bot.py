@@ -5957,7 +5957,6 @@ def gerar_menu_principal(user_id=None):
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
-    markup.add(InlineKeyboardButton('📩 RECEBER CÓDIGO', callback_data='receber_codigos:0'))
     markup.add(bt_comprar)
     markup.add(bt_addsaldo)
     markup.row(bt_perfil, bt_suporte)
@@ -5972,6 +5971,7 @@ def gerar_menu_principal(user_id=None):
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
+    markup.add(InlineKeyboardButton('📩 RECEBER CÓDIGO', callback_data='receber_codigos:0'))
 
     return markup
 
