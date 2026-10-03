@@ -1,7 +1,7 @@
 const tg = window.Telegram?.WebApp;
 const money = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const params = new URLSearchParams(window.location.search);
-const botUsername = (params.get('bot_username') || 'vendasdoramon_bot').replace(/^@/, '');
+const botUsername = (params.get('bot_username') || '').replace(/^@/, '');
 const defaultProductImage = 'assets/store-banner.png';
 const state = { products: [], cart: new Map(), filter: 'todos', query: '' };
 
@@ -23,7 +23,12 @@ const userId = document.querySelector('#userId');
 const tgUser = tg?.initDataUnsafe?.user;
 const currentUserId = tgUser?.id || params.get('user_id') || params.get('id');
 
-document.querySelector('#userPurchases').href = `https://t.me/${encodeURIComponent(botUsername)}`;
+const purchasesLink = document.querySelector('#userPurchases');
+if (botUsername) purchasesLink.href = `https://t.me/${encodeURIComponent(botUsername)}`;
+else purchasesLink.addEventListener('click', (event) => {
+  event.preventDefault();
+  showToast('Abra a loja pelo bot para acessar suas compras');
+});
 
 tg?.ready();
 tg?.expand();
@@ -216,6 +221,7 @@ checkout.addEventListener('click', () => {
     checkout.disabled = false;
     return showToast('Envie menos itens por vez para abrir no bot');
   }
+  if (!botUsername) return showToast('Abra a loja pelo bot para finalizar a compra');
   const link = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
   checkout.disabled = true;
   checkout.textContent = 'Abrindo pagamento no bot...';

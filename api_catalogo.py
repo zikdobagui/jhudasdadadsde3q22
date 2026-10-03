@@ -366,6 +366,54 @@ def reservar_primeiro_acesso(servico, child_bot_id='', buyer_id='', sale_id='', 
     return False, 'out_of_stock', None
 
 
+def notificar_venda_api(acesso, public_owner_id=''):
+    """A reserva já está salva; falhas no Telegram não desfazem a compra."""
+    import html
+    import datetime
+    import pytz
+    import telebot
+    import central as api
+    from sale_notifications import enviar_venda_canal
+
+    bot = telebot.TeleBot(api.CredentialsChange.token_bot())
+    origem = acesso.get('reserved_by', {})
+    user_id = public_owner_id or origem.get('reseller_admin_id') or origem.get('buyer_id') or 'Não informado'
+    user = database.load_user_data(user_id) if str(user_id).isdigit() else None
+    user = user or {}
+    escape = lambda value: html.escape(str(value))
+    username = str(user.get('username') or '').lstrip('@')
+    comprador = f"@{username}" if username else user.get('first_name') or 'Sem username'
+    horario = datetime.datetime.now(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
+    nome = acesso.get('nome', '')
+    valor = acesso.get('valor', 0)
+    texto = (
+        '🛒 <b>NOVA COMPRA</b>\n\n'
+        f'• <b>Cliente:</b> {escape(comprador)}\n'
+        f'• <b>ID:</b> <code>{escape(user_id)}</code>\n'
+        '• <b>Método:</b> API / Key\n'
+        f'• <b>Tipo de key:</b> {"Pessoal do comprador" if public_owner_id else "Integração de estoque"}\n'
+        f'• <b>Serviço:</b> {escape(nome)}\n'
+        f'• <b>Valor:</b> R$ {float(valor):.2f}\n'
+        f'• <b>Data:</b> {horario}\n'
+        f'• <b>Email/Login:</b> <code>{escape(acesso.get("email", ""))}</code>\n'
+        f'• <b>Senha:</b> <code>{escape(acesso.get("senha", ""))}</code>\n'
+        f'• <b>Descrição:</b> {escape(acesso.get("descricao", ""))}'
+    )
+    if user:
+        texto += f'\n• <b>Saldo após compra:</b> R$ {float(user.get("saldo", 0) or 0):.2f}'
+    if origem.get('buyer_id') and str(origem['buyer_id']) != str(user_id):
+        texto += f'\n• <b>Cliente na revenda:</b> <code>{escape(origem["buyer_id"])}</code>'
+    try:
+        bot.send_message(api.CredentialsChange.id_dono(), texto, parse_mode='HTML')
+    except Exception:
+        print('[VENDAS API] Falha ao enviar aviso ao administrador.', flush=True)
+    try:
+        enviar_venda_canal(bot, api.Notificacoes.id_grupo(), api.CredentialsChange.user_bot(),
+                          user_id, nome, valor, horario)
+    except Exception:
+        print('[VENDAS API] Falha ao enviar aviso ao canal de referência.', flush=True)
+
+
 def adicionar_acesso(payload):
     if not isinstance(payload, dict):
         return False, 'Payload invalido'
@@ -488,6 +536,10 @@ class Handler(SimpleHTTPRequestHandler):
                 status, payload = _public_error(reason)
                 self._responder_json(status, payload)
                 return
+            try:
+                notificar_venda_api(acesso, public_owner_id)
+            except Exception:
+                print('[VENDAS API] Falha ao preparar notificações da compra.', flush=True)
             self._responder_json(200, {'access': acesso})
             return
 

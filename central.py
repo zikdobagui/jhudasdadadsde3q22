@@ -192,11 +192,32 @@ class ViewTime():
         hora_sao_paulo_em_texto = data_e_hora_sao_paulo.strftime('%H:%M:%S')
         hora_sao_paulo = datetime.datetime.strptime(hora_sao_paulo_em_texto, '%H:%M:%S').time()
         return hora_sao_paulo
+_bot_identity_cache = {}
+_bot_identity_lock = threading.Lock()
+
+
 class CredentialsChange():
     def user_bot():
         with open_utf8('settings/credenciais.json', 'r') as f:
             data = json.load(f)
-        return str(data["user_bot"])
+        token = str(data['api-bot'])
+        with _bot_identity_lock:
+            now = time.monotonic()
+            cached = _bot_identity_cache.get(token)
+            if cached and now < cached['expires']:
+                return cached['username']
+            try:
+                identity = telebot.apihelper.get_me(token)
+                username = str(identity.get('username') or '').strip().lstrip('@')
+                if not username:
+                    raise ValueError('Bot sem username')
+                ttl = 300
+            except Exception:
+                configured = str(data.get('user_bot') or '').strip().rstrip('/').rsplit('/', 1)[-1]
+                username = cached['username'] if cached else configured.lstrip('@')
+                ttl = 30
+            _bot_identity_cache[token] = {'username': username, 'expires': now + ttl}
+            return username
     def mudar_user_bot(user):
         with open_utf8('settings/credenciais.json', 'r') as f:
             data = json.load(f)
