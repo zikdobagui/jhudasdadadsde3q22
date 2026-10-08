@@ -5883,12 +5883,8 @@ def gerar_menu_principal(user_id=None):
     bt_grupos = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('grupos', 'GRUPOS'), callback_data='menu_grupos'), 'telegram')
     # bt_alugar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('menu_alugar_servidor', 'ALUGAR SERVIDOR'), callback_data='alugar_bot'), 'alugar')
     bt_carrinho = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('carrinho', 'CARRINHO'), callback_data='ver_carrinho'), 'carrinho')
-    bt_historico = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data='baixar_historico_self')
-    bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
-    bt_indique = InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe')
-    bt_premios = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('central_premios', '🎁 CENTRAL DE PRÊMIOS'), callback_data='central_premios'), 'premios')
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
@@ -5898,11 +5894,7 @@ def gerar_menu_principal(user_id=None):
     markup.add(bt_jogos)
     # markup.add(bt_filmes)
     markup.row(bt_estoque, bt_grupos)
-    markup.row(bt_carrinho, bt_historico)
-    markup.add(bt_notificar)
-    markup.add(bt_indique)
-    if premios_ativo():
-        markup.add(bt_premios)
+    markup.add(bt_carrinho)
     if roleta_ativa():
         markup.add(bt_roleta)
     markup.add(bt_pesquisar)
@@ -7371,11 +7363,16 @@ def perfil(call):
     message = call.message
     user = call.from_user
     markup = InlineKeyboardMarkup()
-    bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data=f'baixar_historico {user.id}')
+    bt = InlineKeyboardButton(f'{api.Botoes.download_historico()}', callback_data='baixar_historico_self')
     markup.add(bt)
+    bt_notificar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('notificar_reabastecimento', 'NOTIFICAR REABASTECIMENTO'), callback_data='notificar_reabastecimento'), 'notificar')
+    markup.add(bt_notificar)
     markup.add(InlineKeyboardButton(botao_personalizado('clube_vip', '👑 CLUBE VIP'), callback_data='clube_vip'))
     markup.add(InlineKeyboardButton(f'{custom_emoji("5447410659077661506", "🌐")} Integração API', callback_data='api_publica'))
     markup.add(InlineKeyboardButton(botao_personalizado('indique_ganhe', '👥 INDIQUE E GANHE'), callback_data='indique_ganhe'))
+    if premios_ativo():
+        bt_premios = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('central_premios', '🎁 CENTRAL DE PRÊMIOS'), callback_data='central_premios'), 'premios')
+        markup.add(bt_premios)
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(user)
@@ -9853,7 +9850,7 @@ def callback_query(call):
         return
     
     # Voltar ao menu de notificaÃ§Ãµes
-    if call.data == 'voltar_notif':
+    if call.data in ('voltar_notif', 'notificar_reabastecimento'):
         user_id = call.from_user.id
         notificacoes = database.get_notificacoes_reabastecimento(user_id)
         
