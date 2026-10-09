@@ -549,12 +549,12 @@ def set_reserve_group_id(group_id: int):
 def reserve_group_username():
     url = reserve_group_url().strip()
     if url.startswith('@'):
-        return url
-    match = re.search(r'(?:t\.me|telegram\.me)/([^/?\s]+)', url, re.IGNORECASE)
+        return url if re.fullmatch(r'@[A-Za-z0-9_]+', url) else None
+    match = re.fullmatch(r'(?:https?://)?(?:t\.me|telegram\.me)/(?:s/)?([A-Za-z0-9_]+)/?(?:\?[^\s]*)?', url, re.IGNORECASE)
     if not match:
         return None
     username = match.group(1).strip()
-    if not username or username in ('+', 'joinchat') or username.startswith('+'):
+    if username.lower() in ('joinchat', 'c', 's'):
         return None
     return f'@{username}'
 
@@ -649,22 +649,15 @@ def mark_reserve_verified(user_id: int):
         json.dump({"users": sorted(users)}, f, indent=4)
 
 def is_user_in_reserve_group(user_id: int) -> bool:
-    chat_refs = [reserve_group_id()]
-    username = reserve_group_username()
-    if username:
-        chat_refs.append(username)
-
-    last_error = None
-    for chat_ref in chat_refs:
-        try:
-            member_info = bot.get_chat_member(chat_ref, user_id)
-            return getattr(member_info, 'status', 'left') not in ['left', 'kicked']
-        except ApiTelegramException as error:
-            last_error = error
-
-    if last_error:
-        raise last_error
-    return False
+    # Public links identify the destination shown to the customer. A saved ID
+    # may still refer to an old group and must not override that destination.
+    # Private invite links cannot be queried; those require the configured ID.
+    chat_ref = reserve_group_username() or reserve_group_id()
+    member_info = bot.get_chat_member(chat_ref, user_id)
+    status = getattr(member_info, 'status', None)
+    if status == 'restricted':
+        return bool(getattr(member_info, 'is_member', False))
+    return status in ('member', 'administrator', 'creator')
 
 def reserve_access_ok(user_id: int) -> bool:
     if not reserve_verification_enabled():
@@ -694,7 +687,7 @@ def reserve_verification_text():
     globe = custom_emoji("5447410659077661506", "ðŸŒ")
     return (
         f"{shield} <b>VerificaÃ§Ã£o de identidade</b>\n\n"
-        "Para liberar seu acesso, entre no grupo reserva e dÃª /start no nosso bot reserva.\n"
+        "Para liberar seu acesso, entre no grupo ou canal reserva e dÃª /start no nosso bot reserva.\n"
         "Isso ajuda a proteger sua conta caso este bot principal saia do ar.\n\n"
         "Depois de concluir os dois passos, volte aqui e clique em "
         f"<b>JÃ¡ verifiquei, continuar</b>.\n\n"
@@ -703,7 +696,7 @@ def reserve_verification_text():
 
 def send_reserve_verification(chat_id):
     markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton('👥 Entrar no Grupo Reserva', url=reserve_group_url()))
+    markup.row(InlineKeyboardButton('👥 Entrar no Grupo/Canal Reserva', url=reserve_group_url()))
     markup.row(InlineKeyboardButton('🛡️ Iniciar Bot Reserva', url=reserve_bot_url()))
     markup.row(InlineKeyboardButton('✅ Já verifiquei, continuar', callback_data='reserve_verified_continue'))
     try:
@@ -9109,10 +9102,16 @@ def callback_query(call):
     if call.data == 'reserve_verified_continue':
         try:
             if not is_user_in_reserve_group(call.from_user.id):
-                bot.answer_callback_query(call.id, "Entre no grupo reserva antes de continuar.", show_alert=True)
+                bot.answer_callback_query(call.id, "Entre no grupo ou canal reserva antes de continuar. Se solicitou entrada, aguarde a aprovação.", show_alert=True)
                 return
-        except Exception:
-            bot.answer_callback_query(call.id, "NÃ£o consegui confirmar sua entrada no grupo reserva. Tente de novo em instantes.", show_alert=True)
+        except Exception as error:
+            chat_ref = reserve_group_username() or reserve_group_id()
+            print(f"[RESERVA] Falha ao verificar usuario {call.from_user.id} no chat {chat_ref}: {error}", flush=True)
+            bot.answer_callback_query(
+                call.id,
+                "Não foi possível consultar o grupo/canal. Tente novamente; se persistir, avise o suporte para conferir o destino e as permissões do bot.",
+                show_alert=True,
+            )
             return
         mark_reserve_verified(call.from_user.id)
         bot.answer_callback_query(call.id, "VerificaÃ§Ã£o confirmada.", show_alert=True)
