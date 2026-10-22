@@ -12,6 +12,8 @@ log/
 settings/credenciais.json
 settings/button_overrides.json
 .last_admin_update_commit
+settings/webapp_sessoes.json
+settings/integracao_estoque.json
 
 backups/
 historicos/
@@ -30,3 +32,5 @@ bot_pai/data/
 bot_pai/runtime/
 
 qrcode*.png
+webapp_cache/
+webapp_avatars/

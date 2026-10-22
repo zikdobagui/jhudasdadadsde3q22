@@ -11905,5 +11905,12 @@ else:
     threading.Thread(target=iniciar_sync_acessos, daemon=True).start()
 
 print("? Bot iniciado e pronto para receber mensagens!")
+# ---- Site e painel (vendasdoramon.squareweb.app): sobe junto com o bot. Se falhar, o bot segue normal.
+try:
+    import site_ponte
+    site_ponte.instalar_seguro(globals())
+except Exception as _e_site:
+    print(f"[SITE] nao iniciou: {_e_site}")
+
 bot.infinity_polling()
 

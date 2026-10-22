@@ -53,18 +53,12 @@ def start_scripts():
     try:
         auto_update()
 
-        # O site permanece disponível mesmo se faltar o arquivo privado do bot.
-        api_process = iniciar_api()
-        processos.append(api_process)
-        print('[MINIAPP] API/site iniciado na porta 80.')
-
+        # O site e o painel agora sobem DENTRO do bot (site_ponte.py / webapp.py, porta 80).
+        # O api_catalogo.py (mini app antigo) não é mais iniciado para não disputar a porta 80.
         if not credenciais_disponiveis():
             print('ERRO DE CONFIGURAÇÃO: settings/credenciais.json não foi encontrado.')
             print('Envie esse arquivo privado para a pasta settings/ da aplicação SquareCloud.')
             print('Use settings/credenciais.example.json apenas como modelo; nunca o use com os placeholders.')
-            print('O site ficará online, mas o bot não será iniciado até as credenciais serem enviadas.')
-            while api_process.poll() is None:
-                time.sleep(5)
             return
 
         bot_process = iniciar_bot()

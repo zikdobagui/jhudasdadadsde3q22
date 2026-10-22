@@ -15,6 +15,13 @@ def save_user_data(user_id, user_data):
     user_file = os.path.join(USER_DATA_DIR, f'{user_id}.json')
     with open(user_file, "w", encoding="utf-8") as f:
         json.dump(user_data, f, indent=4)
+    # espelho SQLite usado pelo site/painel (se falhar, não atrapalha o bot)
+    try:
+        import site_espelho
+        if site_espelho._pronto:
+            site_espelho.sincronizar_usuario(user_id, user_data)
+    except Exception:
+        pass
 
 # Função para carregar os dados do usuário
 def load_user_data(user_id):

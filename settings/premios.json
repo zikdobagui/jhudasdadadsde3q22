@@ -1,0 +1,34 @@
+{
+    "status": "on",
+    "textos": {
+        "menu": "TTTESTE<tg-emoji emoji-id=\"5215203359593617488\">🎅</tg-emoji>",
+        "caixas": "<tg-emoji emoji-id=\"5262889711466193287\">🎁</tg-emoji> TESTE TESTE",
+        "bonus": "🧩 <b>BÔNUS / MISSÕES</b>\n\nComplete as tarefas de hoje para liberar recompensas especiais.\n\n{tarefas}",
+        "promocoes": "🎉 <b>Nossas Promoções Especiais:</b>"
+    },
+    "botoes": {
+        "caixa": "🎁 CAIXA MISTERIOSA",
+        "bonus": "🧩 BÔNUS",
+        "promocoes": "🔮 PROMOÇÕES",
+        "cashback": "/admin",
+        "voltar": "↩️ VOLTAR"
+    },
+    "caixas": [
+        {
+            "nome": "Caixa Básica",
+            "valor": 5.0,
+            "ativo": true
+        },
+        {
+            "nome": "Caixa Padrão",
+            "valor": 8.0,
+            "ativo": true
+        },
+        {
+            "nome": "Caixa Premium",
+            "valor": 25.0,
+            "ativo": true
+        }
+    ],
+    "promocoes": []
+}

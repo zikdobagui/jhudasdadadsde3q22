@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex,nofollow">
+<title>RAMON STORE • Painel ADM</title>
+<style>
+:root{--bg:#000;--bg2:#070709;--card:#0d0d11;--card2:#141419;--line:#22222b;--line2:#2e2e3a;--txt:#f2f2f7;--mut:#8a8a9a;
+  --or:#ffb020;--or2:#ff8a00;--gr:#16d39a;--rd:#ff4d5e;--bl:#4da3ff;--pu:#9b7bff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"Segoe UI",Roboto,Inter,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit;font-size:14px;color:var(--txt)}
+button{cursor:pointer}
+.hide{display:none!important}
+a{color:var(--or)}
+/* login */
+#lg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.lgbox{max-width:380px;width:100%;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:28px 24px;text-align:center}
+.lgbox .ic{font-size:44px}
+.lgbox .lgl{width:110px;height:110px;display:block;margin:0 auto 4px}
+nav.side .brand img{width:30px;height:30px;vertical-align:middle;margin-right:8px;border-radius:50%}
+.im-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.im-c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:8px;text-align:center}
+.im-c .pv{width:100%;aspect-ratio:1/1;border-radius:12px;object-fit:cover;background:#0b0b10;display:block}
+.im-c .pvx{width:100%;aspect-ratio:1/1;border-radius:12px;background:#0b0b10;display:flex;align-items:center;justify-content:center;font-size:34px}
+.im-c b{font-size:12.5px;line-height:1.25;word-break:break-word}
+.im-c .bs{display:flex;gap:6px}.im-c .bs .btn{flex:1;padding-left:6px;padding-right:6px}
+
+.lgbox h1{margin:8px 0 6px;font-size:22px}
+.lgbox p{color:var(--mut);line-height:1.5;margin:6px 0}
+.lgbox code{background:#000;border:1px solid var(--line2);border-radius:8px;padding:2px 8px;color:var(--or)}
+/* shell */
+#app{display:flex;min-height:100vh}
+nav.side{width:224px;flex:none;background:var(--bg2);border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:4px}
+nav.side .brand{font-weight:800;font-size:17px;padding:4px 10px 14px;letter-spacing:.3px}
+nav.side .brand small{display:block;color:var(--mut);font-weight:500;font-size:11px;letter-spacing:1.4px;margin-top:2px}
+.nv{font-size:14px;text-decoration:none;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:12px;border:0;background:none;color:var(--mut);text-align:left;font-weight:600;width:100%}
+.nv:hover{background:var(--card2);color:var(--txt)}
+.nv.on{background:linear-gradient(135deg,#ffb02024,#ff8a0012);color:var(--or);box-shadow:inset 0 0 0 1px #ffb02040}
+.nv i{font-style:normal;width:22px;text-align:center}
+.nv .bd{margin-left:auto;background:var(--rd);color:#fff;border-radius:99px;font-size:11px;padding:1px 7px}
+.sp{flex:1}
+main{flex:1;min-width:0;padding:22px 24px 90px}
+.tb{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.tb h2{margin:0;font-size:22px}
+.tb .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:5px 11px;font-size:12px;font-weight:700;border:1px solid var(--line2);background:var(--card)}
+.pill.red{color:var(--rd);border-color:#ff4d5e55}.pill.grn{color:var(--gr);border-color:#16d39a55}.pill.or{color:var(--or);border-color:#ffb02055}
+/* componentes */
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.card h3{margin:0 0 12px;font-size:14px;color:var(--mut);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.st small{display:block;color:var(--mut);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+.st b{display:block;font-size:22px;margin:6px 0 2px;white-space:nowrap}
+.st span{color:var(--mut);font-size:12.5px}
+.or{color:var(--or)}.gr{color:var(--gr)}.rd{color:var(--rd)}.mut{color:var(--mut)}
+.btn{border:0;border-radius:12px;padding:10px 16px;font-weight:700;background:var(--card2);border:1px solid var(--line2)}
+.btn:hover{border-color:var(--or)}
+.btn.pr{background:linear-gradient(135deg,var(--or),var(--or2));color:#1a1000;border:0}
+.btn.rd{background:#ff4d5e1c;color:var(--rd);border-color:#ff4d5e55}
+.btn.gr{background:#16d39a1c;color:var(--gr);border-color:#16d39a55}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:10px}
+.btn:disabled{opacity:.5}
+input,select,textarea{width:100%;background:#000;border:1px solid var(--line2);border-radius:12px;padding:11px 13px;outline:0}
+input:focus,select:focus,textarea:focus{border-color:var(--or)}
+textarea{min-height:130px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+label.f{display:block;margin:0 0 12px}
+label.f>span{display:block;color:var(--mut);font-size:12px;font-weight:700;margin:0 0 6px;letter-spacing:.3px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1;min-width:120px}
+.row>.nf{flex:none;min-width:0}
+table{width:100%;border-collapse:collapse}
+th{color:var(--mut);font-size:11.5px;text-align:left;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:middle;font-size:14px}
+tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto}
+.ls .it{display:flex;gap:12px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line)}
+.ls .it:last-child{border-bottom:0}
+.ls .it .m{flex:1;min-width:0}
+.ls .it b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ls .it small{color:var(--mut)}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--or),var(--or2));border-radius:99px}
+.tag{display:inline-block;border-radius:8px;padding:2px 8px;font-size:11.5px;font-weight:700;background:var(--card2);border:1px solid var(--line2);color:var(--mut)}
+.tag.or{color:var(--or);border-color:#ffb02055}.tag.rd{color:var(--rd);border-color:#ff4d5e55}.tag.gr{color:var(--gr);border-color:#16d39a55}
+.vazio{padding:30px;text-align:center;color:var(--mut)}
+.pg{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:14px}
+/* modal */
+.ov{position:fixed;inset:0;background:#000c;display:none;align-items:flex-end;justify-content:center;z-index:50;padding:0}
+.ov.on{display:flex}
+.md{width:100%;max-width:640px;max-height:92vh;overflow:auto;background:var(--card);border:1px solid var(--line2);border-radius:22px 22px 0 0;padding:20px}
+@media(min-width:700px){.ov{align-items:center;padding:20px}.md{border-radius:22px}}
+.md h3{margin:0 0 14px;font-size:18px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.x{border:0;background:var(--card2);width:34px;height:34px;border-radius:50%;color:var(--mut)}
+.toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99;background:var(--card2);border:1px solid var(--line2);padding:12px 18px;border-radius:14px;max-width:92%;text-align:center;display:none;box-shadow:0 8px 30px #000}
+.toast.err{border-color:var(--rd)}.toast.ok{border-color:var(--gr)}
+.chart{width:100%;height:190px}
+.leg{display:flex;gap:14px;color:var(--mut);font-size:12px;margin-bottom:6px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.chk{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;cursor:pointer}
+.chk input{width:auto}
+.chk:has(input:checked){border-color:var(--or);background:#ffb0200f}
+.sw{position:relative;width:52px;height:30px;flex:none;background:var(--line2);border-radius:99px;border:0;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--rd)}.sw.on::after{left:25px}
+.sw.gr.on{background:var(--gr)}
+.tbr{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bell{position:relative;width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:var(--card);font-size:19px;line-height:1;padding:0}
+.bell:hover{border-color:var(--or)}
+.bell.ring{animation:ring .7s ease 2}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(16deg)}40%{transform:rotate(-14deg)}60%{transform:rotate(9deg)}80%{transform:rotate(-6deg)}}
+.bn{position:absolute;top:-4px;right:-4px;min-width:19px;height:19px;border-radius:99px;background:var(--rd);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid var(--bg)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.chip{border:1px solid var(--line2);background:var(--card2);color:var(--mut);border-radius:99px;padding:6px 12px;font-size:12.5px;font-weight:700}
+.chip.on{color:var(--or);border-color:var(--or);background:#ffb02014}
+.ev{display:flex;gap:11px;padding:11px 8px;border-bottom:1px solid var(--line);border-radius:10px}
+.ev:last-child{border-bottom:0}
+.ev.novo{background:#ffb0200f;box-shadow:inset 3px 0 0 var(--or)}
+.ev .ei{font-size:22px;width:30px;text-align:center;flex:none}
+.ev .em{flex:1;min-width:0}
+.ev .em b{display:block;font-size:14px}
+.ev .em pre{margin:3px 0 0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:12.5px;color:var(--mut);line-height:1.4}
+.ev .ed{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:12px;color:var(--mut)}
+.gw{display:flex;gap:10px;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.gw:last-child{border-bottom:0}
+.gw .m{flex:1;min-width:150px}
+.gw .m small{display:block;color:var(--mut);margin-top:3px}
+/* mobile */
+@media(max-width:820px){
+  #app{flex-direction:column}
+  nav.side{width:100%;height:auto;position:fixed;bottom:0;left:0;right:0;top:auto;z-index:40;flex-direction:row;overflow-x:auto;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);gap:2px;background:#050507}
+  nav.side .brand,nav.side .sp,nav.side .sair{display:none}
+  .nv{flex-direction:column;gap:2px;padding:7px 12px;font-size:11px;width:auto;flex:none;position:relative;white-space:nowrap}
+  .nv i{font-size:18px}
+  .nv .bd{position:absolute;top:2px;right:4px;margin:0}
+  main{padding:16px 14px 100px}
+  .tb h2{font-size:19px}
+  .hm{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="lg">
+  <div class="lgbox">
+    <img class="lgl" src="/pwa/logo-256.png" alt="RAMON STORE" width="110" height="110">
+    <h1>Painel ADM</h1>
+    <p id="lgMsg">Verificando acesso…</p>
+    <p class="hide" id="lgAjuda">Para entrar, envie <code>/painel</code> para o bot no Telegram e toque no link permanente que ele mandar.<br><br>Ou entre na loja com uma conta cujo e-mail esteja em <code>admin_emails</code>.</p>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <nav class="side" id="nav"></nav>
+  <main>
+    <div class="tb"><h2 id="tit"></h2><div class="tbr"><div class="acts" id="acts"></div><button class="bell" id="bell" aria-label="Notificações" title="Notificações (PIX e vendas)">🔔<span class="bn hide" id="bellN"></span></button></div></div>
+    <div id="main"></div>
+  </main>
+</div>
+
+<div class="ov" id="ov"><div class="md" id="md"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const brl = n => 'R$ ' + Number(n || 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in (props || {})) { const v = props[k]; if (v == null || v === false) continue;
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e[k] = v; else if (k === 'value') e.value = v; else e.setAttribute(k, v === true ? '' : v); }
+  kids.flat().forEach(c => { if (c !== '' && c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(String(c))); });
+  return e;
+}
+let token = ''; try { token = localStorage.getItem('rl_admin_token') || ''; } catch(e) {}
+let chaveAdm = ''; try { chaveAdm = localStorage.getItem('rl_admin_key') || ''; } catch(e) {}
+async function entrarChave(chave) {
+  const r = await fetch('/api/admin/entrar_link', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chave})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || 'Link inválido.');
+  token = j.token; chaveAdm = chave;
+  try { localStorage.setItem('rl_admin_token', token); localStorage.setItem('rl_admin_key', chave); } catch(e) {}
+}
+async function api(rota, dados, _re) {
+  const r = await fetch('/api/admin/' + rota, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(Object.assign({token}, dados || {}))});
+  const j = await r.json().catch(() => ({erro: 'Resposta inválida.'}));
+  if (!r.ok) {
+    if (r.status === 401 && !_re && chaveAdm) { try { await entrarChave(chaveAdm); return api(rota, dados, true); } catch(e) { chaveAdm = ''; try { localStorage.removeItem('rl_admin_key'); } catch(x) {} } }
+    if (r.status === 401) sair(true);
+    const e = new Error(j.erro || 'Erro'); e.status = r.status; throw e;
+  }
+  return j;
+}
+let tt;
+function toast(msg, tipo) { const t = $('toast'); t.textContent = msg; t.className = 'toast ' + (tipo || ''); t.style.display = 'block'; clearTimeout(tt); tt = setTimeout(() => t.style.display = 'none', 3600); }
+async function acao(btn, fn, okMsg) {
+  if (btn) btn.disabled = true;
+  try { const r = await fn(); if (okMsg) toast(okMsg, 'ok'); return r; }
+  catch (e) { toast(e.message, 'err'); }
+  finally { if (btn) btn.disabled = false; }
+}
+function abrir(titulo, ...corpo) {
+  $('md').replaceChildren(el('h3', {}, titulo, el('button', {class: 'x', onclick: fechar, 'aria-label': 'Fechar'}, '✕')), ...corpo);
+  $('ov').classList.add('on');
+}
+function fechar() { $('ov').classList.remove('on'); }
+$('ov').onclick = e => { if (e.target === $('ov')) fechar(); };
+function confirmar(msg) { return window.confirm(msg); }
+function copiar(t) { try { navigator.clipboard.writeText(t); toast('Copiado!', 'ok'); } catch(e) { toast('Não foi possível copiar.', 'err'); } }
+const fdata = s => { if (!s) return ''; const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1].slice(2)} ${m[4]}` : String(s); };
+const campo = (rot, input) => el('label', {class: 'f'}, el('span', {}, rot), input);
+
+/* ---------- acesso ---------- */
+function sair(silencioso) {
+  token = ''; chaveAdm = ''; clearInterval(ntTimer); try { localStorage.removeItem('rl_admin_token'); localStorage.removeItem('rl_admin_key'); } catch(e) {}
+  $('app').classList.add('hide'); $('lg').classList.remove('hide');
+  $('lgMsg').textContent = silencioso ? 'Sessão expirada.' : 'Você saiu do painel.'; $('lgAjuda').classList.remove('hide');
+}
+async function iniciar() {
+  const hk = location.hash.match(/k=([\w.-]+)/);
+  if (hk) {
+    history.replaceState(null, '', location.pathname);
+    try { await entrarChave(hk[1]); } catch (e) { $('lgMsg').textContent = e.message; $('lgAjuda').classList.remove('hide'); return; }
+  } else if (!token && chaveAdm) { try { await entrarChave(chaveAdm); } catch (e) { chaveAdm = ''; } }
+  const h = location.hash.match(/c=([\w-]+)/);
+  if (h) {
+    history.replaceState(null, '', location.pathname);
+    try { const r = await fetch('/api/admin/entrar_link', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({codigo: h[1]})});
+      const j = await r.json(); if (!r.ok) throw new Error(j.erro || 'Link inválido.');
+      token = j.token; try { localStorage.setItem('rl_admin_token', token); } catch(e) {}
+    } catch (e) { $('lgMsg').textContent = e.message; $('lgAjuda').classList.remove('hide'); return; }
+  }
+  if (!token) { try { token = localStorage.getItem('rl_token') || ''; } catch(e) {} }   // sessão da loja (conta com e-mail admin)
+  if (!token) { $('lgMsg').textContent = 'Acesso restrito a administradores.'; $('lgAjuda').classList.remove('hide'); return; }
+  try { const eu = await api('eu'); manut = eu.manutencao; $('lg').classList.add('hide'); $('app').classList.remove('hide'); montar(); ir('dash'); ntIniciar(); }
+  catch (e) { $('lgMsg').textContent = e.status === 403 ? 'Esta conta não é administradora.' : e.message; $('lgAjuda').classList.remove('hide'); }
+}
+
+/* ---------- navegação ---------- */
+let manut = false, atual = 'dash';
+const ABAS = [['dash', '📊', 'Resumo'], ['estoque', '📦', 'Estoque'], ['imagens', '🖼️', 'Imagens'], ['clientes', '👥', 'Clientes'], ['vendas', '🧾', 'Vendas'], ['pagamentos', '💳', 'Pagamentos'],
+  ['ofertas', '⚡', 'Ofertas'], ['gifts', '🎁', 'Gift cards'], ['tickets', '💬', 'Tickets'], ['admins', '🕵️', 'Admins'], ['config', '⚙️', 'Ajustes']];
+function montar() {
+  $('nav').replaceChildren(el('div', {class: 'brand'}, el('img', {src: '/pwa/logo-96.png', alt: ''}), 'RAMON STORE', el('small', {}, 'PAINEL ADM')),
+    ...ABAS.map(([k, ic, nm]) => el('button', {class: 'nv', 'data-k': k, onclick: () => ir(k)}, el('i', {}, ic), nm, el('span', {class: 'bd hide', id: 'bd_' + k}))),
+    el('div', {class: 'sp'}), el('button', {class: 'nv sair', onclick: () => { if (confirmar('Sair do painel?')) sair(); }}, el('i', {}, '🚪'), 'Sair'),
+    el('a', {class: 'nv sair', href: '/', style: 'text-decoration:none'}, el('i', {}, '🛒'), 'Ver loja'));
+}
+const VIEWS = {};
+function ir(k) {
+  atual = k;
+  document.querySelectorAll('.nv[data-k]').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  $('tit').textContent = ABAS.find(a => a[0] === k)[2]; $('acts').replaceChildren(); $('main').replaceChildren(el('div', {class: 'vazio'}, 'Carregando…'));
+  window.scrollTo(0, 0);
+  VIEWS[k]().catch(e => { $('main').replaceChildren(el('div', {class: 'vazio rd'}, e.message)); });
+}
+function pagina(info, fn) {
+  const tp = Math.max(1, Math.ceil(info.total / info.por_pagina));
+  return el('div', {class: 'pg'}, el('button', {class: 'btn sm', disabled: info.pagina <= 1, onclick: () => fn(info.pagina - 1)}, '‹'),
+    el('span', {class: 'mut'}, `Página ${info.pagina} de ${tp}`), el('button', {class: 'btn sm', disabled: info.pagina >= tp, onclick: () => fn(info.pagina + 1)}, '›'));
+}
+
+/* ---------- resumo ---------- */
+function stat(rot, val, sub, cls) { return el('div', {class: 'card st'}, el('small', {}, rot), el('b', {class: cls || ''}, val), el('span', {}, sub || '')); }
+function grafico(serie) {
+  const W = 700, H = 190, pad = 24, n = serie.length, max = Math.max(1, ...serie.map(s => Math.max(s.vendas, s.depositos)));
+  const bw = (W - pad * 2) / n, ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('class', 'chart'); svg.setAttribute('preserveAspectRatio', 'none');
+  const add = (tag, at, txt) => { const e = document.createElementNS(ns, tag); for (const k in at) e.setAttribute(k, at[k]); if (txt != null) e.textContent = txt; svg.append(e); return e; };
+  [0, .5, 1].forEach(f => add('line', {x1: pad, x2: W - pad, y1: H - 22 - (H - 44) * f, y2: H - 22 - (H - 44) * f, stroke: '#22222b', 'stroke-width': 1}));
+  serie.forEach((s, i) => {
+    const x = pad + i * bw, h1 = (H - 44) * s.vendas / max, h2 = (H - 44) * s.depositos / max;
+    add('rect', {x: x + bw * .12, y: H - 22 - h1, width: bw * .36, height: Math.max(h1, 1), rx: 3, fill: '#ffb020'}).append(Object.assign(document.createElementNS(ns, 'title'), {textContent: `${s.dia}: vendas ${brl(s.vendas)} (${s.qtd})`}));
+    add('rect', {x: x + bw * .52, y: H - 22 - h2, width: bw * .36, height: Math.max(h2, 1), rx: 3, fill: '#16d39a'}).append(Object.assign(document.createElementNS(ns, 'title'), {textContent: `${s.dia}: depósitos ${brl(s.depositos)}`}));
+    if (i % 2 === 0 || n < 8) add('text', {x: x + bw / 2, y: H - 6, 'text-anchor': 'middle', fill: '#8a8a9a', 'font-size': 11}, s.dia);
+  });
+  return svg;
+}
+VIEWS.dash = async () => {
+  const d = await api('dashboard');
+  $('acts').replaceChildren(el('button', {class: 'btn sm', onclick: () => ir('dash')}, '↻ Atualizar'));
+  const tk = $('bd_tickets'); if (d.tickets_abertos) { tk.textContent = d.tickets_abertos; tk.classList.remove('hide'); } else tk.classList.add('hide');
+  const maxTop = Math.max(1, ...d.top.map(t => t.qtd));
+  $('main').replaceChildren(
+    manut ? el('div', {class: 'card', style: 'border-color:#ff4d5e55;margin-bottom:12px'}, el('b', {class: 'rd'}, '🔧 Loja em manutenção'), ' — clientes não conseguem comprar. Desligue em Ajustes.') : '',
+    el('div', {class: 'grid g4'},
+      stat('Vendas hoje', brl(d.hoje.vendas.valor), d.hoje.vendas.qtd + ' vendas', 'or'),
+      stat('Depósitos hoje', brl(d.hoje.depositos.valor), d.hoje.depositos.qtd + ' PIX', 'gr'),
+      stat('Vendas 7 dias', brl(d.sete.vendas.valor), d.sete.vendas.qtd + ' vendas'),
+      stat('Vendas 30 dias', brl(d.trinta.vendas.valor), d.trinta.vendas.qtd + ' vendas'),
+      stat('Depósitos 30 dias', brl(d.trinta.depositos.valor), d.trinta.depositos.qtd + ' PIX'),
+      stat('Clientes', d.clientes, `${d.contas_site} contas do site · ${d.banidos} banidos`),
+      stat('Saldo dos clientes', brl(d.saldo_total), 'soma de todas as carteiras'),
+      stat('Estoque', d.estoque_total, d.servicos + ' serviços')),
+    el('div', {class: 'card', style: 'margin-top:12px'}, el('h3', {}, 'Últimos 14 dias'),
+      el('div', {class: 'leg'}, el('span', {}, el('i', {style: 'background:#ffb020'}), 'Vendas'), el('span', {}, el('i', {style: 'background:#16d39a'}), 'Depósitos')), grafico(d.serie)),
+    el('div', {class: 'grid g2', style: 'margin-top:12px'},
+      el('div', {class: 'card'}, el('h3', {}, 'Mais vendidos (30 dias)'), d.top.length ? d.top.map(t => el('div', {style: 'margin-bottom:12px'},
+        el('div', {class: 'row', style: 'gap:6px;flex-wrap:nowrap'}, el('span', {style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}, t.produto), el('b', {class: 'nf or'}, t.qtd + 'x')),
+        el('div', {class: 'bar'}, el('i', {style: `width:${t.qtd / maxTop * 100}%`})))) : el('div', {class: 'vazio'}, 'Sem vendas ainda.')),
+      el('div', {class: 'card'}, el('h3', {}, 'Estoque baixo'), d.estoque_baixo.length ? el('div', {class: 'ls'}, d.estoque_baixo.map(e =>
+        el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, e.nome)), el('span', {class: 'tag ' + (e.qtd === 0 ? 'rd' : 'or')}, e.qtd + ' un.')))) : el('div', {class: 'vazio'}, 'Tudo abastecido 👍'))),
+    el('div', {class: 'card', style: 'margin-top:12px'}, el('h3', {}, 'Últimas vendas'), el('div', {class: 'ls'}, d.ultimas.map(v =>
+      el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, v.produto), el('small', {}, `${v.username || v.user_id} · ${fdata(v.data)}`)), el('b', {class: 'or'}, brl(v.valor))))))
+  );
+};
+
+/* ---------- estoque ---------- */
+/* ---------- imagens dos aplicativos ---------- */
+function reduzirImagem(file) {
+  return new Promise((ok, erro) => {
+    if (!file || !/^image\/(png|jpe?g|webp)$/i.test(file.type)) return erro(new Error('Escolha uma imagem JPG, PNG ou WEBP.'));
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const lado = Math.min(img.width, img.height), T = Math.min(768, lado), c = document.createElement('canvas');
+      c.width = c.height = T;
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, T, T);
+      g.drawImage(img, (img.width - lado) / 2, (img.height - lado) / 2, lado, lado, 0, 0, T, T);   // recorte quadrado central
+      let q = 0.9, d = c.toDataURL('image/jpeg', q);
+      while (d.length > 520000 && q > 0.4) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+      d.length > 540000 ? erro(new Error('Imagem muito pesada. Tente outra.')) : ok(d);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); erro(new Error('Não consegui abrir essa imagem.')); };
+    img.src = url;
+  });
+}
+const imgSrc = s => '/img?n=' + encodeURIComponent(s.nome) + (s.v ? '&v=' + s.v : '') + '&t=' + Date.now();
+VIEWS.imagens = async () => {
+  const d = await api('imagens/listar');
+  $('acts').replaceChildren(el('button', {class: 'btn sm', onclick: () => ir('imagens')}, '↻ Atualizar'));
+  const filtro = el('input', {placeholder: 'Pesquisar serviço…', style: 'margin-bottom:12px'});
+  const grade = el('div', {class: 'im-g'});
+  const desenhar = () => {
+    const q = filtro.value.trim().toLowerCase();
+    grade.replaceChildren(...d.itens.filter(s => !q || s.nome.toLowerCase().includes(q)).map(cartao));
+  };
+  function cartao(s) {
+    const pv = el('img', {class: 'pv', alt: s.nome, loading: 'lazy', src: imgSrc(s)});
+    const caixa = el('div', {class: 'im-c'});
+    pv.onerror = () => { const x = el('div', {class: 'pvx'}, '🖼️'); pv.replaceWith(x); };
+    const arq = el('input', {type: 'file', accept: 'image/png,image/jpeg,image/webp', class: 'hide'});
+    const trocar = el('button', {class: 'btn sm pr', onclick: () => arq.click()}, s.custom ? 'Trocar' : 'Definir');
+    arq.onchange = () => { const f = arq.files[0]; arq.value = ''; if (!f) return;
+      acao(trocar, async () => { const img = await reduzirImagem(f); const r = await api('imagens/definir', {nome: s.nome, imagem: img}); s.custom = true; s.v = r.v; caixa.replaceWith(cartao(s)); }, '✅ Imagem atualizada no site.'); };
+    const bs = el('div', {class: 'bs'}, trocar);
+    if (s.custom) bs.append(el('button', {class: 'btn sm', onclick: e => { if (!confirmar('Voltar para a imagem padrão de "' + s.nome + '"?')) return;
+      acao(e.currentTarget, async () => { const r = await api('imagens/remover', {nome: s.nome}); s.custom = false; s.v = r.v; caixa.replaceWith(cartao(s)); }, 'Imagem padrão restaurada.'); }}, 'Padrão'));
+    caixa.append(pv, el('b', {}, s.nome), s.custom ? el('span', {class: 'tag gr'}, 'personalizada') : el('span', {class: 'tag'}, 'padrão'), bs, arq);
+    return caixa;
+  }
+  filtro.oninput = desenhar; desenhar();
+  $('main').replaceChildren(el('div', {class: 'card', style: 'margin-bottom:12px'},
+    el('p', {class: 'mut', style: 'margin:0;font-size:13px'}, 'Toque em “Trocar” para enviar a imagem do aplicativo (ela é cortada em quadrado). Vale só para o site; “Padrão” volta à imagem anterior.')),
+    filtro, d.itens.length ? grade : el('div', {class: 'vazio'}, 'Nenhum serviço cadastrado ainda.'));
+};
+
+VIEWS.estoque = async () => {
+  const d = await api('estoque/listar');
+  $('acts').replaceChildren(el('button', {class: 'btn sm', onclick: () => formServico(null)}, '＋ Novo serviço'), el('button', {class: 'btn pr', onclick: () => formAdicionar(d.itens)}, '＋ Adicionar logins'));
+  const total = d.itens.reduce((a, b) => a + b.qtd, 0);
+  $('main').replaceChildren(el('div', {class: 'card'}, el('h3', {}, `${d.itens.length} serviços salvos · ${total} logins em estoque`),
+    d.itens.length ? el('div', {class: 'tw'}, el('table', {}, el('thead', {}, el('tr', {}, ...['Serviço', 'Estoque', 'Preço', 'Prazo', ''].map(t => el('th', {}, t)))),
+      el('tbody', {}, d.itens.map(s => el('tr', {}, el('td', {}, el('b', {}, s.nome), s.oferta != null ? el('span', {class: 'tag or', style: 'margin-left:8px'}, '⚡ ' + brl(s.oferta)) : ''),
+        el('td', {}, el('span', {class: 'tag ' + (s.qtd === 0 ? 'rd' : s.qtd <= 3 ? 'or' : 'gr')}, s.qtd)), el('td', {}, brl(s.valor)), el('td', {class: 'mut'}, s.duracao + ' d'),
+        el('td', {style: 'white-space:nowrap;text-align:right'}, el('button', {class: 'btn sm pr', onclick: () => formAdicionar(d.itens, s)}, '＋ Logins'), ' ',
+          s.qtd ? el('button', {class: 'btn sm', onclick: () => verLogins(s)}, 'Ver') : '', s.qtd ? ' ' : '', el('button', {class: 'btn sm', onclick: () => formEditar(s)}, 'Editar'))))))) : el('div', {class: 'vazio'}, 'Nenhum serviço salvo. Toque em “Novo serviço”.')));
+};
+function formServico() {
+  const nome = el('input', {placeholder: 'Ex.: NETFLIX PREMIUM'}), valor = el('input', {inputmode: 'decimal', placeholder: '0,00'}), dur = el('input', {inputmode: 'numeric', value: '30'}), desc = el('input', {placeholder: 'Opcional'});
+  const b = el('button', {class: 'btn pr', style: 'width:100%'}, 'Salvar serviço');
+  b.onclick = () => acao(b, async () => { await api('estoque/salvar_servico', {nome: nome.value, valor: valor.value, duracao: dur.value, descricao: desc.value}); fechar(); toast('✅ Serviço salvo. Agora é só adicionar os logins.', 'ok'); ir('estoque'); });
+  abrir('Novo serviço', campo('Nome do serviço', nome), el('div', {class: 'row'}, campo('Preço (R$)', valor), campo('Prazo (dias)', dur)), campo('Descrição', desc),
+    el('p', {class: 'mut', style: 'font-size:12.5px'}, 'Fica salvo na lista mesmo sem logins. Depois use “＋ Logins” para abastecer.'), b);
+}
+function formAdicionar(itens, pre) {
+  const nome = el('input', {list: 'dlNomes', placeholder: 'Ex.: NETFLIX PREMIUM', value: pre ? pre.nome : ''}), valor = el('input', {inputmode: 'decimal', placeholder: '0,00', value: pre ? pre.valor : ''}),
+    dur = el('input', {inputmode: 'numeric', value: pre ? pre.duracao : '30'}), desc = el('input', {placeholder: 'Opcional', value: pre ? (pre.descricao === '-' ? '' : pre.descricao) : ''}),
+    linhas = el('textarea', {placeholder: 'email1@exemplo.com:senha1\nemail2@exemplo.com:senha2'});
+  nome.onchange = () => { const s = itens.find(x => x.nome.toLowerCase() === nome.value.trim().toLowerCase()); if (s) { valor.value = s.valor; dur.value = s.duracao; desc.value = s.descricao === '-' ? '' : s.descricao; } };
+  const b = el('button', {class: 'btn pr', style: 'width:100%'}, 'Adicionar ao estoque');
+  b.onclick = () => acao(b, async () => {
+    const r = await api('estoque/adicionar', {nome: nome.value, valor: valor.value, duracao: dur.value, descricao: desc.value, linhas: linhas.value});
+    fechar(); toast(`✅ ${r.adicionados} adicionados` + (r.repetidos ? ` · ${r.repetidos} repetidos ignorados` : '') + (r.invalidas.length ? ` · linhas inválidas: ${r.invalidas.join(', ')}` : ''), r.adicionados ? 'ok' : 'err'); ir('estoque');
+  });
+  abrir('Adicionar logins', el('datalist', {id: 'dlNomes'}, itens.map(s => el('option', {value: s.nome}))), campo('Nome do serviço', nome),
+    el('div', {class: 'row'}, campo('Preço (R$)', valor), campo('Prazo (dias)', dur)), campo('Descrição', desc),
+    campo('Logins (um por linha: email:senha)', linhas), b);
+}
+function formEditar(s) {
+  const nome = el('input', {value: s.nome}), valor = el('input', {inputmode: 'decimal', value: s.valor}), dur = el('input', {inputmode: 'numeric', value: s.duracao}), desc = el('input', {value: s.descricao === '-' ? '' : s.descricao});
+  const b = el('button', {class: 'btn pr', style: 'flex:2'}, 'Salvar'), del = el('button', {class: 'btn rd', style: 'flex:1'}, s.qtd ? 'Excluir serviço' : 'Excluir');
+  b.onclick = () => acao(b, async () => { const r = await api('estoque/editar', {nome: s.nome, novo_nome: nome.value, valor: valor.value, duracao: dur.value, descricao: desc.value}); fechar(); toast(r.alterados ? `✅ Salvo · ${r.alterados} logins atualizados` : '✅ Serviço salvo', 'ok'); ir('estoque'); });
+  del.onclick = () => { if (confirmar(s.qtd ? `Excluir o serviço \"${s.nome}\" e os ${s.qtd} logins que ainda estão no estoque? Não dá para desfazer.` : `Excluir o serviço \"${s.nome}\" da lista de salvos?`)) acao(del, async () => { const r = await api('estoque/remover_servico', {nome: s.nome}); fechar(); toast(r.removidos ? `🗑️ Serviço e ${r.removidos} logins removidos` : '🗑️ Serviço removido', 'ok'); ir('estoque'); }); };
+  abrir('Editar serviço', campo('Nome', nome), el('div', {class: 'row'}, campo('Preço (R$)', valor), campo('Prazo (dias)', dur)), campo('Descrição', desc),
+    el('p', {class: 'mut', style: 'font-size:12.5px'}, s.qtd ? 'A alteração vale para o serviço salvo e para todos os logins dele no estoque.' : 'Serviço salvo sem logins no momento.'), el('div', {class: 'row', style: 'flex-wrap:nowrap'}, b, del));
+}
+async function verLogins(s) {
+  const r = await api('estoque/logins', {nome: s.nome});
+  const lista = el('div', {class: 'ls'});
+  const pintar = () => { lista.replaceChildren(...(r.itens.length ? r.itens.map(l => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, l.email), el('small', {}, l.senha)),
+    el('button', {class: 'btn sm', onclick: () => copiar(l.email + ':' + l.senha)}, 'Copiar'),
+    el('button', {class: 'btn sm rd', onclick: () => { if (confirmar('Remover este login do estoque?')) acao(null, async () => { await api('estoque/remover', {nome: s.nome, email: l.email}); r.itens = r.itens.filter(x => x !== l); pintar(); toast('Removido.', 'ok'); }); }}, '🗑️')))
+    : [el('div', {class: 'vazio'}, 'Sem logins.')])); };
+  pintar();
+  abrir(s.nome, el('div', {class: 'row', style: 'margin-bottom:10px'}, el('span', {class: 'mut'}, r.itens.length + ' logins'),
+    el('button', {class: 'btn sm nf', onclick: () => copiar(r.itens.map(l => l.email + ':' + l.senha).join('\n'))}, 'Copiar todos')), lista);
+}
+
+/* ---------- clientes ---------- */
+let cq = '', cordem = 'saldo';
+VIEWS.clientes = async function (pag) {
+  const d = await api('clientes/listar', {q: cq, ordem: cordem, pagina: typeof pag === 'number' ? pag : 1});
+  const q = el('input', {placeholder: 'Buscar por ID, @usuário, nome ou e-mail', value: cq}), ord = el('select', {class: 'nf', style: 'width:auto'}, ...[['saldo', 'Maior saldo'], ['compras', 'Mais compras'], ['pagos', 'Mais depósitos'], ['recentes', 'Mais novos']].map(([v, t]) => el('option', {value: v, selected: v === cordem}, t)));
+  const go = () => { cq = q.value.trim(); cordem = ord.value; VIEWS.clientes(1).catch(e => toast(e.message, 'err')); };
+  q.onkeydown = e => { if (e.key === 'Enter') go(); }; ord.onchange = go;
+  $('main').replaceChildren(el('div', {class: 'row', style: 'margin-bottom:12px;flex-wrap:nowrap'}, q, ord, el('button', {class: 'btn pr nf', onclick: go}, 'Buscar')),
+    el('div', {class: 'card'}, el('h3', {}, d.total + ' clientes'), d.itens.length ? el('div', {class: 'ls'}, d.itens.map(c => el('div', {class: 'it', style: 'cursor:pointer', onclick: () => cliente(c.id)},
+      el('div', {class: 'm'}, el('b', {}, (c.username || 'sem nome') + (c.email ? ' · ' + c.email : '')), el('small', {}, `ID ${c.id} · ${c.compras} compras · ${brl(c.pagos)} depositados`)),
+      c.banido ? el('span', {class: 'tag rd'}, 'banido') : '', c.origem === 'site' ? el('span', {class: 'tag'}, 'site') : '', el('b', {class: c.saldo > 0 ? 'gr' : 'mut'}, brl(c.saldo))))) : el('div', {class: 'vazio'}, 'Nenhum cliente encontrado.'),
+      pagina(d, p => VIEWS.clientes(p))));
+};
+async function cliente(id) {
+  const c = await api('clientes/ver', {id});
+  const valor = el('input', {inputmode: 'decimal', placeholder: 'Valor (R$)'}), motivo = el('input', {placeholder: 'Motivo (opcional)'});
+  const sal = el('b', {class: 'gr', style: 'font-size:22px'}, brl(c.saldo));
+  const mov = (ac, txt, cls) => { const b = el('button', {class: 'btn sm ' + cls}, txt); b.onclick = () => { if (ac !== 'set' || confirmar('Definir o saldo para este valor exato?')) acao(b, async () => { const r = await api('clientes/saldo', {id, acao: ac, valor: valor.value, motivo: motivo.value}); sal.textContent = brl(r.depois); valor.value = ''; toast(`Saldo: ${brl(r.antes)} → ${brl(r.depois)}`, 'ok'); }); }; return b; };
+  const banBtn = el('button', {class: 'btn sm ' + (c.banido ? 'gr' : 'rd')}, c.banido ? 'Desbanir' : 'Banir');
+  banBtn.onclick = () => { if (confirmar(c.banido ? 'Desbanir este cliente?' : 'Banir este cliente?')) acao(banBtn, async () => { await api('clientes/ban', {id, ban: !c.banido}); fechar(); toast(c.banido ? 'Desbanido.' : 'Banido.', 'ok'); VIEWS.clientes(1); }); };
+  abrir(c.username || ('ID ' + c.id), el('div', {class: 'row', style: 'margin-bottom:12px;flex-wrap:nowrap'}, el('div', {}, el('small', {class: 'mut'}, `ID ${c.id}` + (c.email ? ' · ' + c.email : '') + (c.origem === 'site' ? ' · conta do site' : '')), el('div', {}, sal)), el('div', {class: 'nf'}, banBtn)),
+    el('div', {class: 'card', style: 'background:var(--bg);margin-bottom:12px'}, el('h3', {}, 'Saldo'), valor, el('div', {style: 'height:8px'}), motivo,
+      el('div', {class: 'row', style: 'margin-top:10px'}, mov('add', '＋ Adicionar', 'gr'), mov('remove', '− Remover', 'rd'), mov('set', '= Definir', ''))),
+    el('div', {class: 'card', style: 'background:var(--bg);margin-bottom:12px'}, el('h3', {}, `Compras (${c.compras})`), c.compras_lista.length ? el('div', {class: 'ls'}, c.compras_lista.slice(0, 15).map(v => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, v.produto), el('small', {}, fdata(v.data) + (v.email ? ' · ' + v.email : ''))), el('b', {class: 'or'}, brl(v.valor))))) : el('div', {class: 'vazio'}, 'Sem compras.')),
+    el('div', {class: 'card', style: 'background:var(--bg);margin-bottom:12px'}, el('h3', {}, 'Depósitos'), c.pagamentos_lista.length ? el('div', {class: 'ls'}, c.pagamentos_lista.map(v => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, brl(v.valor)), el('small', {}, fdata(v.data))), el('small', {class: 'mut'}, String(v.id_pagamento).slice(-8))))) : el('div', {class: 'vazio'}, 'Sem depósitos.')),
+    el('div', {class: 'card', style: 'background:var(--bg)'}, el('h3', {}, 'Movimentações de saldo'), c.movimentacoes.length ? el('div', {class: 'ls'}, c.movimentacoes.map(v => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, `${v.tipo} ${brl(v.valor)}`), el('small', {}, `${fdata(v.data)} · ${v.motivo || ''}`)), el('small', {class: 'mut'}, `${brl(v.saldo_anterior)} → ${brl(v.saldo_novo)}`)))) : el('div', {class: 'vazio'}, 'Nenhuma.')));
+}
+
+/* ---------- vendas / depósitos ---------- */
+let vf = {q: '', de: '', ate: '', aba: 'vendas'};
+VIEWS.vendas = async function (pag) {
+  pag = typeof pag === 'number' ? pag : 1;
+  const ehV = vf.aba === 'vendas';
+  const d = await api(ehV ? 'vendas/listar' : 'pagamentos/listar', Object.assign({pagina: pag}, vf));
+  $('acts').replaceChildren(el('button', {class: 'btn sm' + (ehV ? ' pr' : ''), onclick: () => { vf.aba = 'vendas'; VIEWS.vendas(1); }}, 'Vendas'), el('button', {class: 'btn sm' + (!ehV ? ' pr' : ''), onclick: () => { vf.aba = 'dep'; VIEWS.vendas(1); }}, 'Depósitos'));
+  const q = el('input', {placeholder: 'Produto, cliente, ID ou e-mail', value: vf.q}), de = el('input', {type: 'date', value: vf.de}), ate = el('input', {type: 'date', value: vf.ate});
+  const go = () => { vf.q = q.value.trim(); vf.de = de.value; vf.ate = ate.value; VIEWS.vendas(1); };
+  q.onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('main').replaceChildren(ehV ? el('div', {class: 'row', style: 'margin-bottom:12px'}, q, de, ate, el('button', {class: 'btn pr nf', onclick: go}, 'Filtrar')) : '',
+    el('div', {class: 'card'}, el('h3', {}, `${d.total} registros · ${brl(d.soma)}`), d.itens.length ? el('div', {class: 'ls'}, d.itens.map(v => ehV
+      ? el('div', {class: 'it', style: 'cursor:pointer', onclick: () => cliente(v.user_id)}, el('div', {class: 'm'}, el('b', {}, v.produto), el('small', {}, `${v.username || v.user_id} · ${fdata(v.data)}${v.email ? ' · ' + v.email : ''}`)), el('b', {class: 'or'}, brl(v.valor)))
+      : el('div', {class: 'it', style: 'cursor:pointer', onclick: () => cliente(v.user_id)}, el('div', {class: 'm'}, el('b', {}, brl(v.valor)), el('small', {}, `${v.username || v.user_id} · ${fdata(v.data)}`)), el('small', {class: 'mut'}, String(v.id_pagamento).slice(-8))))) : el('div', {class: 'vazio'}, 'Nada por aqui.'),
+      pagina(d, p => VIEWS.vendas(p))));
+};
+
+/* ---------- ofertas ---------- */
+VIEWS.ofertas = async () => {
+  const [o, e] = await Promise.all([api('ofertas/listar'), api('estoque/listar')]);
+  $('acts').replaceChildren(o.itens.length ? el('button', {class: 'btn rd sm', onclick: () => { if (confirmar('Encerrar TODAS as ofertas?')) acao(null, async () => { await api('ofertas/remover', {todas: true}); toast('Ofertas encerradas.', 'ok'); ir('ofertas'); }); }}, 'Encerrar todas') : '');
+  const sel = new Set(), modo = el('select', {}, el('option', {value: 'preco'}, 'Preço promocional (R$)'), el('option', {value: 'percentual'}, 'Desconto (%)')),
+    valor = el('input', {inputmode: 'decimal', placeholder: 'Ex.: 9,90'}), min = el('input', {inputmode: 'numeric', value: '60'}), lim = el('input', {inputmode: 'numeric', value: '0'});
+  const b = el('button', {class: 'btn pr', style: 'width:100%'}, '⚡ Criar oferta');
+  b.onclick = () => acao(b, async () => { const r = await api('ofertas/criar', {servicos: [...sel], modo: modo.value, valor: valor.value, minutos: min.value, limite: lim.value}); toast(`⚡ Oferta criada em ${r.qtd} serviço(s)`, 'ok'); ir('ofertas'); });
+  $('main').replaceChildren(el('div', {class: 'grid g2'},
+    el('div', {class: 'card'}, el('h3', {}, 'Ofertas ativas'), o.itens.length ? el('div', {class: 'ls'}, o.itens.map(x => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, x.servico), el('small', {}, `${brl(x.original)} → ${brl(x.promo)} · até ${fdata(x.fim)}${x.limite ? ' · limite ' + x.limite : ''}`)),
+      el('button', {class: 'btn sm rd', onclick: () => acao(null, async () => { await api('ofertas/remover', {servico: x.servico}); toast('Oferta encerrada.', 'ok'); ir('ofertas'); })}, 'Encerrar')))) : el('div', {class: 'vazio'}, 'Nenhuma oferta ativa.')),
+    el('div', {class: 'card'}, el('h3', {}, 'Nova oferta relâmpago'), el('div', {style: 'max-height:260px;overflow:auto;margin-bottom:12px'}, e.itens.map(s => el('label', {class: 'chk'}, el('input', {type: 'checkbox', onchange: ev => { ev.target.checked ? sel.add(s.nome) : sel.delete(s.nome); }}), el('span', {style: 'flex:1'}, s.nome), el('span', {class: 'mut'}, brl(s.valor))))),
+      campo('Tipo de desconto', modo), campo('Valor', valor), el('div', {class: 'row'}, campo('Duração (min)', min), campo('Limite por compra (0 = sem)', lim)), b)));
+  modo.onchange = () => { valor.placeholder = modo.value === 'percentual' ? 'Ex.: 20' : 'Ex.: 9,90'; };
+};
+
+/* ---------- gift cards ---------- */
+VIEWS.gifts = async () => {
+  const d = await api('gifts/listar');
+  const valor = el('input', {inputmode: 'decimal', placeholder: 'Valor (R$)'}), qtd = el('input', {inputmode: 'numeric', value: '1'}), cod = el('input', {placeholder: 'Opcional (se for 1 gift)'});
+  const b = el('button', {class: 'btn pr', style: 'width:100%'}, '🎁 Criar');
+  b.onclick = () => acao(b, async () => { const r = await api('gifts/criar', {valor: valor.value, quantidade: qtd.value, codigo: cod.value}); abrir('Gift cards criados', el('p', {class: 'mut'}, `${r.codigos.length} × ${brl(r.valor)}`), el('textarea', {readonly: true, style: 'min-height:160px'}, r.codigos.join('\n')), el('button', {class: 'btn pr', style: 'width:100%;margin-top:10px', onclick: () => copiar(r.codigos.join('\n'))}, 'Copiar códigos')); ir('gifts'); });
+  $('main').replaceChildren(el('div', {class: 'grid g2'},
+    el('div', {class: 'card'}, el('h3', {}, 'Criar gift cards'), campo('Valor', valor), el('div', {class: 'row'}, campo('Quantidade', qtd), campo('Código', cod)), b),
+    el('div', {class: 'card'}, el('h3', {}, `${d.itens.length} disponíveis`), d.itens.length ? el('div', {class: 'ls'}, d.itens.slice().reverse().map(g => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {style: 'font-family:ui-monospace,monospace'}, g.codigo)), el('b', {class: 'or'}, brl(g.valor)),
+      el('button', {class: 'btn sm', onclick: () => copiar(g.codigo)}, 'Copiar'), el('button', {class: 'btn sm rd', onclick: () => { if (confirmar('Apagar este gift card?')) acao(null, async () => { await api('gifts/remover', {codigo: g.codigo}); toast('Apagado.', 'ok'); ir('gifts'); }); }}, '🗑️')))) : el('div', {class: 'vazio'}, 'Nenhum gift card.'))));
+};
+
+/* ---------- tickets ---------- */
+VIEWS.tickets = async () => {
+  const d = await api('tickets/listar', {});
+  $('main').replaceChildren(el('div', {class: 'card'}, el('h3', {}, 'Atendimentos'), d.itens.length ? el('div', {class: 'ls'}, d.itens.map(t => el('div', {class: 'it', style: 'cursor:pointer', onclick: () => ticket(t.id)},
+    el('div', {class: 'm'}, el('b', {}, `${t.numero || '#' + t.id} · ${t.categoria || 'geral'}`), el('small', {}, `${t.nome || t.username || t.user_id} · ${fdata(t.criado_em)}`)), el('span', {class: 'tag ' + (t.status === 'aberto' ? 'or' : 'gr')}, t.status)))) : el('div', {class: 'vazio'}, 'Nenhum ticket.'),
+    el('p', {class: 'mut', style: 'font-size:12.5px;margin-top:12px'}, 'Para responder o cliente, use o bot no Telegram (o painel mostra só a leitura).')));
+};
+async function ticket(id) {
+  const r = await api('tickets/ver', {id});
+  abrir(`Ticket ${r.ticket.numero || '#' + r.ticket.id}`, el('p', {class: 'mut'}, `${r.ticket.nome || r.ticket.username || r.ticket.user_id} · ${r.ticket.categoria || ''} · ${r.ticket.status}`),
+    el('div', {class: 'ls'}, r.mensagens.length ? r.mensagens.map(m => el('div', {class: 'it'}, el('div', {class: 'm'}, el('small', {class: m.remetente === 'cliente' ? 'or' : 'mut'}, `${m.remetente === 'cliente' ? 'Cliente' : m.remetente === 'atendente' ? 'Atendente' : 'Sistema'}${m.autor_nome ? ' · ' + m.autor_nome : ''}`),
+      el('div', {style: 'white-space:pre-wrap;word-break:break-word;margin-top:3px'}, m.tipo && m.tipo !== 'texto' ? `[${m.tipo}] ` : '', m.conteudo || '')))) : [el('div', {class: 'vazio'}, 'Sem mensagens.')]));
+}
+
+/* ---------- ajustes ---------- */
+VIEWS.config = async () => {
+  const c = await api('config/ver');
+  const bk = await api('backup/estado').catch(() => null), cn = await api('canal/estado').catch(() => null);
+  const sw = el('button', {class: 'sw' + (c.manutencao ? ' on' : ''), 'aria-label': 'Modo manutenção'});
+  sw.onclick = () => { const novo = !sw.classList.contains('on'); if (!confirmar(novo ? 'Ligar a manutenção? Os clientes não conseguirão comprar.' : 'Desligar a manutenção?')) return; acao(sw, async () => { const r = await api('config/manutencao', {on: novo}); manut = r.manutencao; sw.classList.toggle('on', manut); toast(manut ? '🔧 Manutenção ligada' : '✅ Loja liberada', 'ok'); }); };
+  const txt = el('textarea', {placeholder: 'Mensagem para todos os clientes do Telegram (aceita <b>negrito</b> e <i>itálico</i>)', style: 'min-height:120px;font-family:inherit'}), status = el('div', {class: 'mut', style: 'margin-top:10px;font-size:13px'});
+  const env = el('button', {class: 'btn pr', style: 'width:100%'}, '📢 Enviar para todos');
+  env.onclick = () => { if (!confirmar('Enviar esta mensagem para TODOS os clientes do Telegram agora?')) return; acao(env, async () => { const r = await api('transmitir', {texto: txt.value, confirmar: true}); toast(`Enviando para ${r.total} clientes…`, 'ok'); acompanhar(); }); };
+  let tmr; const acompanhar = async () => { clearTimeout(tmr); try { const s = await api('transmitir/status'); if (s.total) status.textContent = `${s.rodando ? 'Enviando… ' : 'Concluído: '}${s.ok} enviados · ${s.falha} falhas · de ${s.total}`; if (s.rodando && atual === 'config') tmr = setTimeout(acompanhar, 2000); } catch(e) {} };
+  const ie = c.integracao_estoque || {}, apiUrl = el('input', {placeholder: 'https://api.suaempresa.com', value: ie.url || '', type: 'url'}), apiKey = el('input', {placeholder: ie.conectada ? '••••••••  (já existe uma chave salva)' : 'Cole aqui a sua API key', type: 'password', autocomplete: 'new-password'});
+  const salvarApi = el('button', {class: 'btn pr', style: 'width:100%'}, ie.conectada ? '🔄 Atualizar conexão' : '🔗 Conectar API');
+  salvarApi.onclick = () => acao(salvarApi, async () => { await api('integracao_estoque/salvar', {url: apiUrl.value, key: apiKey.value}); toast('API conectada. A lojinha já usará o estoque dela.', 'ok'); ir('config'); });
+  const testarApi = el('button', {class: 'btn sm', style: 'flex:1'}, 'Testar conexão');
+  testarApi.onclick = () => acao(testarApi, async () => { const r = await api('integracao_estoque/testar'); toast(`Conexão OK: ${r.produtos} produtos encontrados.`, 'ok'); });
+  const desconectarApi = ie.conectada ? el('button', {class: 'btn sm rd', style: 'flex:1'}, 'Desconectar') : null;
+  if (desconectarApi) desconectarApi.onclick = () => { if (confirmar('Desconectar a API? A loja voltará a usar o estoque local.')) acao(desconectarApi, async () => { await api('integracao_estoque/desconectar'); toast('API desconectada.', 'ok'); ir('config'); }); };
+  const cardApi = el('div', {class: 'card'}, el('h3', {}, '🔗 API de estoque'), el('p', {class: 'mut', style: 'line-height:1.5'}, ie.conectada ? 'Conectada. A key fica protegida no servidor e não é exibida aqui.' : 'Conecte sua API para a lojinha puxar catálogo, estoque e entregar acessos por ela.'), campo('URL da API', apiUrl), campo('API key', apiKey), el('div', {class: 'row', style: 'margin-top:10px'}, salvarApi, testarApi, desconectarApi || ''));
+  $('main').replaceChildren(el('div', {class: 'grid g2'},
+    el('div', {class: 'card'}, el('h3', {}, 'Modo manutenção'), el('div', {class: 'row', style: 'flex-wrap:nowrap'}, el('div', {}, el('b', {}, 'Loja em manutenção'), el('div', {class: 'mut', style: 'font-size:12.5px;margin-top:3px'}, 'Bloqueia compras no bot e no site.')), el('div', {class: 'nf'}, sw))),
+    el('div', {class: 'card'}, el('h3', {}, 'Transmissão'), txt, el('div', {style: 'height:10px'}), env, status),
+    cardApi,
+    el('div', {class: 'card'}, el('h3', {}, 'Quem pode entrar aqui'), el('p', {class: 'mut', style: 'line-height:1.55'}, 'Admins do bot: envie ', el('code', {}, '/painel'), ' no Telegram e abra o link permanente (não expira; ', el('code', {}, '/painel novo'), ' troca o link se vazar). Contas do site: coloque o e-mail em ', el('code', {}, 'admin_emails'), ' no ', el('code', {}, 'settings/webapp.json'), '.'),
+      el('div', {style: 'margin-top:8px'}, c.admin_emails.length ? c.admin_emails.map(m => el('span', {class: 'tag', style: 'margin:0 6px 6px 0'}, m)) : el('span', {class: 'mut'}, 'Nenhum e-mail configurado.'))),
+    cn && cardCanal(cn), bk && cardBackup(bk),
+    el('div', {class: 'card hm-show'}, el('h3', {}, 'Sessão'), el('button', {class: 'btn rd', style: 'width:100%', onclick: () => { if (confirmar('Sair do painel?')) sair(); }}, '🚪 Sair do painel')),
+    el('div', {class: 'card'}, el('h3', {}, 'Registro de ações'), el('p', {class: 'mut', style: 'line-height:1.55'}, 'Tudo que você faz aqui (saldo, estoque, bans, ofertas…) fica gravado em ', el('code', {}, 'log/painel_admin.txt'), '.'))));
+  if (c.transmissao && c.transmissao.total) acompanhar();
+};
+
+/* ---------- helpers de configuração ---------- */
+function interruptor(on, fn) {
+  const b = el('button', {class: 'sw gr' + (on ? ' on' : '')});
+  b.onclick = () => acao(b, async () => { const novo = !b.classList.contains('on'); await fn(novo); b.classList.toggle('on', novo); });
+  return el('div', {class: 'nf'}, b);
+}
+function linhaSw(tit, desc, on, fn) {
+  return el('div', {class: 'row', style: 'flex-wrap:nowrap;margin-bottom:14px'}, el('div', {}, el('b', {}, tit), el('div', {class: 'mut', style: 'font-size:12.5px;margin-top:3px'}, desc)), interruptor(on, fn));
+}
+function linhaNum(rot, valor, salvar, dica) {
+  const i = el('input', {inputmode: 'decimal', value: String(valor), placeholder: dica || ''});
+  const b = el('button', {class: 'btn sm pr'}, 'Salvar');
+  b.onclick = () => acao(b, async () => { await salvar(i.value); }, 'Salvo ✅');
+  return el('div', {style: 'margin-bottom:12px'}, el('span', {class: 'mut', style: 'display:block;font-size:12px;font-weight:700;margin-bottom:6px'}, rot), el('div', {class: 'row', style: 'flex-wrap:nowrap'}, i, el('div', {class: 'nf'}, b)));
+}
+
+/* ---------- Ajustes: backup e canal ---------- */
+function cardCanal(c) {
+  return el('div', {class: 'card'}, el('h3', {}, 'Grupo/canal obrigatório'),
+    linhaSw('Exigir entrada no grupo', 'O cliente precisa estar no grupo para usar o bot. ID: ' + c.id, c.ativo, async on => { await api('canal/definir', {on}); }));
+}
+function cardBackup(b) {
+  const lista = b.arquivos.length ? el('div', {class: 'ls', style: 'margin-top:8px'}, b.arquivos.map(a => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, a.nome), el('small', {}, `${a.mb} MB · ${a.data}`))))) : el('div', {class: 'mut', style: 'margin-top:8px;font-size:13px'}, 'Nenhum backup guardado no servidor ainda.');
+  const agora = el('button', {class: 'btn pr', style: 'width:100%'}, '💾 Fazer backup agora');
+  agora.onclick = () => { if (!confirmar('Criar um backup agora e enviar no seu Telegram?')) return; acao(agora, async () => { const r = await api('backup/acao', {acao: 'agora'}); toast(r.msg, 'ok'); }); };
+  return el('div', {class: 'card'}, el('h3', {}, 'Backup'),
+    linhaSw('Backup automático', `Roda a cada ${b.intervalo_min >= 60 ? (b.intervalo_min / 60) + 'h' : b.intervalo_min + ' min'} (o intervalo muda pelo bot).`, b.ativo, async on => { await api('backup/acao', {acao: 'auto', on}); }),
+    agora, lista);
+}
+
+/* ---------- Pagamentos ---------- */
+VIEWS.pagamentos = async () => {
+  const [c, pend, g1, g2] = await Promise.all([api('pagamentos/config'), api('pagamentos/pendentes'),
+    api('notificacoes/listar', {tipo: 'pix_gerado', limite: 12}), api('notificacoes/listar', {tipo: 'pix_pago', limite: 12})]);
+  const salvar = async (campo, valor) => { await api('pagamentos/salvar', {campo, valor}); };
+  const recarregar = () => { if (atual === 'pagamentos') ir('pagamentos'); };
+  const ordem = c.ordem.map(x => ({pushinpay: 'PushinPay', misticpay: 'MisticPay', mercadopago: 'Mercado Pago'}[x] || x)).join(' → ') || '—';
+  const gws = c.gateways.map(g => {
+    const usar = el('button', {class: 'btn sm ' + (g.id === c.gateway_ativo ? 'gr' : 'pr'), disabled: g.id === c.gateway_ativo || !g.configurado}, g.id === c.gateway_ativo ? 'Ativo' : 'Usar este');
+    usar.onclick = () => acao(usar, async () => { await salvar('gateway', g.id); recarregar(); }, `${g.nome} ativado ✅`);
+    const ch = el('button', {class: 'btn sm'}, '🔑 Chaves');
+    ch.onclick = () => chavesGateway(g, recarregar);
+    return el('div', {class: 'gw'}, el('div', {class: 'm'}, el('b', {}, g.nome),
+      el('small', {}, g.configurado ? (g.estavel ? '🟢 Estável' : `🟠 Instável (${g.falhas} falhas seguidas)`) : '⚪ Sem credenciais')),
+      g.id === c.gateway_ativo ? el('span', {class: 'tag gr'}, 'EM USO') : '', usar, ch);
+  });
+  const lista = (itens, vazio) => itens.length ? el('div', {}, itens.map(evento)) : el('div', {class: 'mut', style: 'padding:6px 4px'}, vazio);
+  $('main').replaceChildren(el('div', {class: 'grid g2'},
+    el('div', {class: 'card'}, el('h3', {}, 'Gateways de PIX'), ...gws,
+      el('div', {style: 'height:12px'}),
+      el('div', {class: 'mut', style: 'font-size:12.5px'}, 'Ordem de tentativa agora: ', el('b', {}, ordem))),
+    el('div', {class: 'card'}, el('h3', {}, 'Depósitos por PIX'),
+      linhaSw('PIX automático', 'Gera o PIX pelos gateways e credita sozinho.', c.pix.automatico, on => salvar('pix_automatico', on)),
+      linhaSw('PIX manual', 'Libera o depósito manual (cliente fala com o admin).', c.pix.manual, on => salvar('pix_manual', on)),
+      linhaNum('Depósito mínimo (R$)', c.pix.minimo, v => salvar('minimo', v).then(recarregar)),
+      linhaNum('Depósito máximo (R$)', c.pix.maximo, v => salvar('maximo', v).then(recarregar)),
+      linhaNum('Expiração do PIX (minutos)', c.pix.expiracao, v => salvar('expiracao', v).then(recarregar))),
+    el('div', {class: 'card'}, el('h3', {}, 'Bônus de depósito'),
+      linhaNum('Bônus (%)', c.pix.bonus_pct, v => salvar('bonus_pct', v).then(recarregar), '0 = sem bônus'),
+      linhaNum('Depósito mínimo para ganhar bônus (R$)', c.pix.bonus_min, v => salvar('bonus_min', v).then(recarregar))),
+    el('div', {class: 'card'}, el('h3', {}, `PIX aguardando pagamento (${pend.itens.length})`),
+      pend.itens.length ? el('div', {class: 'ls'}, pend.itens.map(p => el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, brl(p.valor)), el('small', {}, `ID ${p.user_id} · há ${p.ha_seg < 3600 ? Math.max(1, Math.round(p.ha_seg / 60)) + ' min' : Math.round(p.ha_seg / 3600) + ' h'}`)),
+        el('button', {class: 'btn sm', onclick: () => { fechar(); cliente(p.user_id).catch(e => toast(e.message, 'err')); }}, 'Ver cliente')))) : el('div', {class: 'mut'}, 'Nenhum PIX pendente na última hora.')),
+    el('div', {class: 'card'}, el('h3', {}, 'Últimos PIX pagos'), lista(g2.itens, 'Nada por aqui ainda.')),
+    el('div', {class: 'card'}, el('h3', {}, 'Últimos PIX gerados'), lista(g1.itens, 'Nada por aqui ainda.'))));
+};
+function chavesGateway(g, depois) {
+  const campos = g.id === 'misticpay'
+    ? [['client_id', 'Client ID'], ['client_secret', 'Client Secret']]
+    : [['token', g.id === 'mercadopago' ? 'Access Token' : 'Token (API key)']];
+  const ins = {}; campos.forEach(([k]) => ins[k] = el('input', {type: 'password', autocomplete: 'off', placeholder: 'Cole aqui para trocar'}));
+  const b = el('button', {class: 'btn pr', style: 'width:100%'}, 'Salvar chaves');
+  b.onclick = () => acao(b, async () => { const d = {gateway: g.id}; for (const k in ins) d[k] = ins[k].value; await api('pagamentos/credenciais', d); fechar(); depois(); }, 'Chaves salvas ✅');
+  abrir('🔑 ' + g.nome, el('p', {class: 'mut', style: 'line-height:1.5'}, g.configurado ? 'Já existe uma chave salva (por segurança ela nunca é mostrada). Cole uma nova só se quiser trocar.' : 'Cole as credenciais do gateway.'),
+    ...campos.map(([k, rot]) => campo(rot, ins[k])), b);
+}
+
+/* ---------- Admins ---------- */
+VIEWS.admins = async () => {
+  const r = await api('admins/listar');
+  const id = el('input', {inputmode: 'numeric', placeholder: 'ID numérico do Telegram'});
+  const add = el('button', {class: 'btn pr', style: 'width:100%'}, '＋ Adicionar admin');
+  add.onclick = () => acao(add, async () => { await api('admins/adicionar', {id: id.value}); ir('admins'); }, 'Admin adicionado ✅');
+  $('main').replaceChildren(el('div', {class: 'grid g2'},
+    el('div', {class: 'card'}, el('h3', {}, 'Administradores'), el('div', {class: 'ls'}, r.itens.map(a => {
+      const rm = el('button', {class: 'btn sm rd', disabled: a.dono}, 'Remover');
+      rm.onclick = () => { if (confirmar(`Remover o admin ${a.id}?`)) acao(rm, async () => { await api('admins/remover', {id: a.id}); ir('admins'); }, 'Removido.'); };
+      return el('div', {class: 'it'}, el('div', {class: 'm'}, el('b', {}, a.username ? '@' + a.username : 'ID ' + a.id), el('small', {}, `ID ${a.id}`)), a.dono ? el('span', {class: 'tag or'}, 'DONO') : rm);
+    }))),
+    el('div', {class: 'card'}, el('h3', {}, 'Novo admin'), campo('ID do Telegram', id), add,
+      el('p', {class: 'mut', style: 'line-height:1.55;font-size:13px;margin-top:12px'}, 'Quem for admin recebe os avisos do bot e pode pedir o link do painel com ', el('code', {}, '/painel'), ' (permanente — ', el('code', {}, '/painel novo'), ' troca o link).'))));
+};
+
+/* ---------- 🔔 notificações ---------- */
+let ntUlt = null, ntNao = 0, ntTimer = 0, ntTipo = '', ntSom = true;
+const NT_TIPOS = [['', 'Tudo'], ['pix_gerado', '💸 PIX gerado'], ['pix_pago', '✅ PIX pago'], ['venda', '🛍️ Vendas'], ['cadastro', '🆕 Cadastros'], ['ticket', '💬 Tickets']];
+function evento(e) {
+  const linhas = String(e.texto || '').split('\n').filter(Boolean).slice(0, 5).join('\n');
+  return el('div', {class: 'ev' + (e.novo ? ' novo' : '')}, el('div', {class: 'ei'}, e.icone),
+    el('div', {class: 'em'}, el('b', {}, e.titulo || e.rotulo), linhas ? el('pre', {}, linhas) : '',
+      el('div', {class: 'ed'}, e.valor != null ? el('span', {class: 'tag gr'}, brl(e.valor)) : '', e.user_id ? el('button', {class: 'btn sm', onclick: () => { fechar(); cliente(e.user_id).catch(x => toast(x.message, 'err')); }}, 'ID ' + e.user_id) : '', el('span', {}, fdata(e.ts)))));
+}
+function bipe() {
+  if (!ntSom) return;
+  try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(.15, a.currentTime); g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .35); o.start(); o.stop(a.currentTime + .36); } catch(e) {}
+}
+function ntBadge() {
+  const n = $('bellN'); n.textContent = ntNao > 99 ? '99+' : ntNao; n.classList.toggle('hide', !ntNao);
+  document.title = (ntNao ? `(${ntNao}) ` : '') + 'RAMON STORE • Painel ADM';
+}
+async function ntPoll() {
+  if (!token) return;
+  try {
+    const r = await api('notificacoes/listar', {apos: ntUlt == null ? 0 : ntUlt, limite: ntUlt == null ? 1 : 10});
+    const primeira = ntUlt == null;
+    if (!primeira && r.itens.length) {
+      const e = r.itens[0];
+      toast(`${e.icone} ${e.titulo}${e.valor != null ? ' — ' + brl(e.valor) : ''}`, 'ok');
+      $('bell').classList.remove('ring'); void $('bell').offsetWidth; $('bell').classList.add('ring'); bipe();
+      try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('RAMON STORE • ' + e.titulo, {body: (e.texto || '').split('\n')[0] || ''}); } catch(x) {}
+      if ($('ov').classList.contains('on') && $('md').dataset.nt) abrirNotif();
+    }
+    ntUlt = r.ultimo_id; ntNao = r.nao_lidas; ntBadge();
+  } catch (e) {}
+}
+function ntIniciar() {
+  clearInterval(ntTimer); ntUlt = null; ntPoll(); ntTimer = setInterval(ntPoll, 15000);
+  $('bell').onclick = abrirNotif;
+}
+async function abrirNotif() {
+  const r = await api('notificacoes/listar', {tipo: ntTipo, limite: 60}).catch(e => { toast(e.message, 'err'); return null; });
+  if (!r) return;
+  const chips = el('div', {class: 'chips'}, NT_TIPOS.map(([k, n]) => el('button', {class: 'chip' + (k === ntTipo ? ' on' : ''), onclick: () => { ntTipo = k; abrirNotif(); }}, n)));
+  const som = el('button', {class: 'btn sm'}, ntSom ? '🔊 Som ligado' : '🔇 Som desligado'); som.onclick = () => { ntSom = !ntSom; som.textContent = ntSom ? '🔊 Som ligado' : '🔇 Som desligado'; if (ntSom) bipe(); };
+  const perm = ('Notification' in window && Notification.permission === 'default') ? el('button', {class: 'btn sm', onclick: () => Notification.requestPermission().then(() => toast('Avisos do navegador atualizados.', 'ok'))}, '📲 Avisos no navegador') : '';
+  abrir('🔔 Notificações', el('div', {class: 'row', style: 'margin-bottom:10px;flex-wrap:wrap'}, el('span', {class: 'mut', style: 'flex:2;min-width:160px'}, 'Os mesmos avisos que o bot manda no seu Telegram.'), som, perm), chips,
+    r.itens.length ? el('div', {}, r.itens.map(evento)) : el('div', {class: 'vazio'}, 'Nenhum aviso ainda.'));
+  $('md').dataset.nt = '1';
+  if (r.nao_lidas) { api('notificacoes/lidas').then(() => { ntNao = 0; ntBadge(); }).catch(() => {}); }
+}
+const _fecharOrig = fechar; fechar = function () { delete $('md').dataset.nt; _fecharOrig(); };
+
+iniciar();
+</script>
+</body>
+</html>

@@ -8,3 +8,5 @@ httpx
 httpx[http2]
 watchdog
 psutil
+Pillow
+qrcode

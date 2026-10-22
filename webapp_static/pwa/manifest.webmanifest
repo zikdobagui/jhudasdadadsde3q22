@@ -1,0 +1,48 @@
+{
+ "name": "RAMON STORE",
+ "short_name": "RAMON STORE",
+ "description": "Streamings e contas com os melhores preços.",
+ "id": "/",
+ "start_url": "/?utm_source=app",
+ "scope": "/",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#000005",
+ "theme_color": "#000000",
+ "lang": "pt-BR",
+ "categories": [
+  "shopping"
+ ],
+ "icons": [
+  {
+   "src": "/pwa/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "/pwa/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "/pwa/icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Ofertas",
+   "url": "/?aba=ofertas",
+   "icons": [
+    {
+     "src": "/pwa/icon-192.png",
+     "sizes": "192x192"
+    }
+   ]
+  }
+ ]
+}

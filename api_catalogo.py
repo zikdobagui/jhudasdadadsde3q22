@@ -221,6 +221,54 @@ def _telegram_avatar(user_id):
         return None
 
 
+# ─── API do bot de CÓDIGOS ────────────────────────────────────────────────────
+# O bot de códigos (Ramon Codigos) depende destas rotas para saber quem comprou
+# o quê. Se elas sumirem, ele recebe 404 e para de mostrar as contas dos clientes.
+#   GET /api/user/<id>/exists   GET /api/user/<id>   GET /api/acessos   GET /api/produtos
+CODIGOS_CAMPOS_PRIVADOS = ('api_publica',)
+CODIGOS_PRODUTOS_TTL_SECONDS = 300
+_codigos_produtos_cache = {'at': 0.0, 'produtos': []}
+_codigos_produtos_lock = threading.Lock()
+
+
+def _codigos_user_id(path):
+    """/api/user/<id> ou /api/user/<id>/exists → (id, somente_exists). None se não for rota do bot de códigos."""
+    partes = path.strip('/').split('/')
+    if len(partes) not in (3, 4) or partes[:2] != ['api', 'user'] or not partes[2].isdigit():
+        return None
+    if len(partes) == 3:
+        return partes[2], False
+    if partes[3] == 'exists':
+        return partes[2], True
+    return None
+
+
+def _codigos_produtos_vendidos():
+    """Nomes únicos de serviço de todas as compras (lê todos os usuários; fica em cache)."""
+    with _codigos_produtos_lock:
+        if time.time() - _codigos_produtos_cache['at'] < CODIGOS_PRODUTOS_TTL_SECONDS:
+            return list(_codigos_produtos_cache['produtos'])
+        nomes = set()
+        users_dir = os.path.join(BASE_DIR, 'database', 'users')
+        if os.path.isdir(users_dir):
+            for filename in os.listdir(users_dir):
+                if not filename.endswith('.json'):
+                    continue
+                try:
+                    user_data = database.load_user_data(filename[:-5])
+                except Exception:
+                    continue
+                if not isinstance(user_data, dict):
+                    continue
+                for compra in user_data.get('compras', []) or []:
+                    nome = str(compra.get('servico', '') if isinstance(compra, dict) else '').strip()
+                    if nome:
+                        nomes.add(nome)
+        _codigos_produtos_cache['at'] = time.time()
+        _codigos_produtos_cache['produtos'] = sorted(nomes)
+        return list(_codigos_produtos_cache['produtos'])
+
+
 def _public_error(reason):
     if reason == 'out_of_stock':
         return 404, {'error': reason}
@@ -448,6 +496,19 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
+
+        # Bot de códigos: com a chave certa não entra no limite por IP (ele faz
+        # várias consultas por clique e todas saem do mesmo IP).
+        if path in ('/api/acessos', '/api/produtos') or _codigos_user_id(path):
+            if self._autorizado_codigos():
+                self._responder_api_codigos(path)
+                return
+            if _rate_limited(_client_ip(self), 'get'):
+                self._responder_json(429, {'error': 'rate_limited'})
+                return
+            self._responder_json(401, {'error': 'unauthorized'})
+            return
+
         if _rate_limited(_client_ip(self), 'get'):
             self._responder_json(429, {'error': 'rate_limited'})
             return
@@ -559,6 +620,35 @@ class Handler(SimpleHTTPRequestHandler):
         if _same_secret(expected_key, received_key):
             return 'global'
         return _find_public_api_owner(received_key)
+
+    def _autorizado_codigos(self):
+        # Só a chave global (stock_api_key): estas rotas devolvem logins e compras.
+        received_key = self.headers.get('X-Stock-Key', '') or self.headers.get('X-API-Key', '')
+        return _same_secret(_stock_api_key(), received_key)
+
+    def _responder_api_codigos(self, path):
+        try:
+            if path == '/api/acessos':
+                self._responder_json(200, {'ok': True, 'acessos': _load_acessos().get('acessos', [])})
+                return
+            if path == '/api/produtos':
+                self._responder_json(200, {'ok': True, 'produtos': _codigos_produtos_vendidos()})
+                return
+
+            user_id, somente_exists = _codigos_user_id(path)
+            user_data = database.load_user_data(user_id)
+            existe = isinstance(user_data, dict)
+            if somente_exists:
+                self._responder_json(200, {'ok': True, 'exists': existe})
+                return
+            if not existe:
+                self._responder_json(404, {'ok': False, 'error': 'Usuário não encontrado'})
+                return
+            user = {k: v for k, v in user_data.items() if k not in CODIGOS_CAMPOS_PRIVADOS}
+            self._responder_json(200, {'ok': True, 'user': user})
+        except Exception:
+            traceback.print_exc()
+            self._responder_json(500, {'ok': False, 'error': 'internal_error'})
 
     def _ler_json(self):
         try:
