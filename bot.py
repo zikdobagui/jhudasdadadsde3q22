@@ -7335,30 +7335,6 @@ def handle_start(message):
         if importar_carrinho_miniapp_start(message, start_payload):
             return
 
-    # VERIFICAÃ‡ÃƒO DE PARTICIPAÃ‡ÃƒO OBRIGATÃ“RIA NO GRUPO/CANAL
-    try:
-        member_info = bot.get_chat_member(REQUIRED_GROUP_ID, message.from_user.id)
-        if getattr(member_info, 'status', 'left') in ['left', 'kicked']:
-            markup = InlineKeyboardMarkup().add(
-                InlineKeyboardButton("👥 Entrar no Grupo", url=JOIN_GROUP_LINK)
-            )
-            bot.send_message(
-                message.chat.id,
-                "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
-                reply_markup=markup
-            )
-            return
-    except ApiTelegramException:
-        markup = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("👥 Entrar no Grupo", url=JOIN_GROUP_LINK)
-        )
-        bot.send_message(
-            message.chat.id,
-            "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
-            reply_markup=markup
-        )
-        return
-
     texto = decorate_start_text(message)
 
     # Usando a funÃ§Ã£o gerar_menu_principal() para os botÃµes
