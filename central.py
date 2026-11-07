@@ -101,7 +101,9 @@ def open_utf8(filepath, mode='r'):
     if 'r' in mode and '+' not in mode:
         ensure_default_database_file(filepath)
         ensure_default_text_file(filepath)
-    return open(filepath, mode, encoding='utf-8')
+    # Usa utf-8-sig para remover BOM automaticamente ao ler
+    encoding = 'utf-8-sig' if 'r' in mode else 'utf-8'
+    return open(filepath, mode, encoding=encoding)
 
 def _load_credentials_data():
     with open_utf8('settings/credenciais.json', 'r') as f:

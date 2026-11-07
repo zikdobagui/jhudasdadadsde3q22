@@ -1,4 +1,4 @@
-﻿import mercadopago
+import mercadopago
 import json
 import string
 import telebot
@@ -18,6 +18,7 @@ import base64
 import time
 from telebot.apihelper import ApiTelegramException
 import database
+import player_api
 import threading
 import re
 import os
@@ -341,6 +342,9 @@ pending_vip_level_edit = {}
 pending_price_edit = {}
 # Estado para adicionar notificaÃ§Ã£o de reabastecimento
 pending_notif_reabast = {}
+# Estado para configurar API Key do Player
+pending_player_api_key = {}
+pending_player_markup = {}
 # Compras aguardando aceite dos termos antes de descontar saldo/entregar
 pending_terms_purchase = {}
 
@@ -726,6 +730,7 @@ MENU_PREMIUM_EMOJI_IDS = {
     "filmes": "5350693961281314631",
     "estoque": "5231200819986047254",
     "telegram": "5447410659077661506",
+    "globe": "5447410659077661506",
     "whatsapp": "5467538555158943525",
     "alugar": "5350396951407895212",
     "carrinho": "5350486389806868244",
@@ -1401,16 +1406,18 @@ if backup_manager.config.get('auto_backup_enabled', False):
     backup_manager.start_auto_backup()
 
 try:
-    bot.send_message(
-        chat_id=api.CredentialsChange.id_dono(),
-        text='ðŸ¤– <b>BOT INICIADO COM SUCESSO!</b> âœ…',
-        parse_mode='HTML',
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton('âš™ï¸ PAINEL ADMIN', callback_data='voltar_paineladm')]]
-        )
+    owner_id = api.CredentialsChange.id_dono()
+    if owner_id and str(owner_id).strip() and str(owner_id) != '0':
+        bot.send_message(
+                chat_id=api.CredentialsChange.id_dono(),
+                text='ðŸ¤– <b>BOT INICIADO COM SUCESSO!</b> âœ…',
+                parse_mode='HTML',
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton('âš™ï¸ PAINEL ADMIN', callback_data='voltar_paineladm')]]
+            )
     )
 except Exception as e:
-    print(f"âš ï¸ NÃ£o foi possÃ­vel enviar mensagem de inicializaÃ§Ã£o: {e}")
+    print(f"[INICIALIZACAO] Nao foi possivel enviar mensagem ao dono: {e}")
 
 def salvar_chat_notificacoes(message):
     chat = message.chat
@@ -1709,6 +1716,8 @@ def handle_cancelar(message):
     pending_text_edit.pop(message.chat.id, None)
     pending_button_edit.pop(message.chat.id, None)
     pending_description_edit.pop(message.chat.id, None)
+    pending_player_api_key.pop(message.from_user.id, None)
+    pending_player_markup.pop(message.from_user.id, None)
     bot.reply_to(message, "ordem cancelada!")
 
 @bot.message_handler(commands=['admin'])
@@ -1716,31 +1725,38 @@ def painel_admin(message):
     blocked = chr(0x1F6AB)
 
     if api.Admin.verificar_admin(message.chat.id) or int(message.chat.id) == int(api.CredentialsChange.id_dono()):
-        gear = chr(0x2699) + chr(0xFE0F)
-        warning = chr(0x26A0) + chr(0xFE0F)
-        calendar = chr(0x1F4C5)
-        chart = chr(0x1F4CA)
-        users = chr(0x1F465)
-        money = chr(0x1F4B0)
-        box = chr(0x1F4E6)
-        bulb = chr(0x1F4A1)
-        lock = chr(0x1F510)
-        admin_icon = chr(0x1F468) + chr(0x200D) + chr(0x1F4BC)
-        handshake = chr(0x1F91D)
-        card = chr(0x1F4B3)
-        megaphone = chr(0x1F4E2)
-        memo = chr(0x1F4DD)
-        image_icon = chr(0x1F5BC) + chr(0xFE0F)
-        button_icon = chr(0x1F518)
-        clipboard = chr(0x1F4CB)
-        soccer = chr(0x26BD)
-        movie = chr(0x1F3AC)
-        floppy = chr(0x1F4BE)
-        back = chr(0x1F519)
-        check = chr(0x2705)
+        # Ícones premium usados no painel. Cada botão recebe apenas um ícone
+        # animado via icon_custom_emoji_id; os textos usam a tag premium.
+        premium = {
+            'settings': '5350486389806868244', 'alert': '5447644880824181073',
+            'calendar': '5370784581341422520', 'chart': '5350693961281314631',
+            'users': '5210956306952758910', 'money': '5456140674028019486',
+            'box': '5231200819986047254', 'idea': '5370784581341422520',
+            'lock': '5440660757194744323', 'admin': '5352825278672412291',
+            'partner': '5350396951407895212', 'image': '5231200819986047254',
+            'edit': '5210956306952758910', 'back': '5443038326535759644',
+            'globe': '5447410659077661506',
+        }
+        def ptext(key, fallback):
+            return custom_emoji(premium[key], fallback)
+        def pbutton(label, callback, key):
+            button = InlineKeyboardButton(label, callback_data=callback)
+            button.icon_custom_emoji_id = premium[key]
+            return button
+
+        gear = ptext('settings', '⚙️')
+        warning = ptext('alert', '⚠️')
+        calendar = ptext('calendar', '📅')
+        chart = ptext('chart', '📊')
+        users = ptext('users', '👥')
+        money = ptext('money', '💰')
+        box = ptext('box', '📦')
+        bulb = ptext('idea', '💡')
+        maintenance_enabled = api.CredentialsChange.status_manutencao()
+        maintenance_label = 'Manutenção: ATIVADA' if maintenance_enabled else 'Manutenção: DESATIVADA'
 
         if api.Admin.tempo_ate_o_vencimento() <= 0:
-            vencimento = f"{warning} <b>SEU BOT ESTA VENCIDO!</b> {warning}"
+            vencimento = f"{warning} <b>SEU BOT ESTA VENCIDO!</b>"
         else:
             vencimento = f"{calendar} <b>SEU BOT VENCE EM {api.Admin.tempo_ate_o_vencimento()} DIAS!</b>"
 
@@ -1758,32 +1774,34 @@ def painel_admin(message):
         )
 
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton(f'{gear} Configuracoes Gerais', callback_data='configuracoes_geral'))
-        markup.row(InlineKeyboardButton(f'{users} Gerenciar Clientes', callback_data='gerenciar_clientes'))
+        markup.row(pbutton('Configurações Gerais', 'configuracoes_geral', 'settings'))
+        markup.row(pbutton('Gerenciar Clientes', 'gerenciar_clientes', 'users'))
         if usa_estoque_central():
-            markup.row(InlineKeyboardButton(f'{money} Precos de Venda', callback_data='precos_revenda'),
-                       InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
+            markup.row(pbutton('Preços de Venda', 'precos_revenda', 'money'),
+                       pbutton('Configurar Admins', 'configurar_admins', 'admin'))
         else:
-            markup.row(InlineKeyboardButton(f'{lock} Configurar Logins', callback_data='configurar_logins'),
-                       InlineKeyboardButton(f'{admin_icon} Configurar Admins', callback_data='configurar_admins'))
-        markup.row(InlineKeyboardButton(f'{handshake} Configurar Afiliados', callback_data='configurar_afiliados'),
-                   InlineKeyboardButton('👑 Clube VIP', callback_data='admin_vip'))
-        markup.row(InlineKeyboardButton(f'{card} Configurar PIX', callback_data='configurar_pix'))
-        markup.row(InlineKeyboardButton(f'{megaphone} Notificacoes Fake', callback_data='configurar_notificacoes_fake'))
-        markup.row(InlineKeyboardButton(f'{memo} Editar Textos', callback_data='editar_textos'),
-                   InlineKeyboardButton(f'{image_icon} Gerenciar Imagens', callback_data='gerenciar_imagens'))
-        markup.row(InlineKeyboardButton(f'{card} Configurar Pagamentos', callback_data='configurar_pagamentos'))
-        markup.row(InlineKeyboardButton('📣 Destinos Reais', callback_data='config_destinos_reais'),
-                   InlineKeyboardButton(f'{button_icon} Editar Botoes', callback_data='editar_botoes'))
-        markup.row(InlineKeyboardButton(f'{clipboard} Gerenciar Descricoes', callback_data='gerenciar_descricoes'))
-        markup.row(InlineKeyboardButton(f'{soccer}{movie} Jogos e Filmes', callback_data='gerenciar_jogos_filmes'))
-        markup.row(InlineKeyboardButton('🎰 Configurar Roleta', callback_data='admin_roleta'),
-                   InlineKeyboardButton(f'{check} Gift Card', callback_data='gift_card'))
-        markup.row(InlineKeyboardButton('🎁 Central de Premios', callback_data='admin_premios'))
-        markup.row(InlineKeyboardButton(f'{chart} Consultar Vendas', callback_data='menu_vendas'),
-                   InlineKeyboardButton(f'{floppy} Gerenciar Backups', callback_data='menu_backups'))
-        markup.row(InlineKeyboardButton(f'{megaphone} Transmitir a Todos', callback_data='configurar_usuarios'))
-        markup.row(InlineKeyboardButton(f'{back} Voltar', callback_data='voltar_menu'))
+            markup.row(pbutton('Configurar Logins', 'configurar_logins', 'lock'),
+                       pbutton('Configurar Admins', 'configurar_admins', 'admin'))
+        markup.row(pbutton('Configurar Afiliados', 'configurar_afiliados', 'partner'),
+                   pbutton('Clube VIP', 'admin_vip', 'idea'))
+        markup.row(pbutton('Configurar PIX', 'configurar_pix', 'money'))
+        markup.row(pbutton('Notificações Fake', 'configurar_notificacoes_fake', 'alert'))
+        markup.row(pbutton('Editar Textos', 'editar_textos', 'edit'),
+                   pbutton('Gerenciar Imagens', 'gerenciar_imagens', 'image'))
+        markup.row(pbutton('Configurar Pagamentos', 'configurar_pagamentos', 'money'))
+        markup.row(pbutton('Destinos Reais', 'config_destinos_reais', 'alert'),
+                   pbutton('Editar Botões', 'editar_botoes', 'edit'))
+        markup.row(pbutton('Gerenciar Descrições', 'gerenciar_descricoes', 'edit'))
+        markup.row(pbutton('Jogos e Filmes', 'gerenciar_jogos_filmes', 'idea'))
+        markup.row(pbutton('Configurar Roleta', 'admin_roleta', 'chart'),
+                   pbutton('Gift Card', 'gift_card', 'box'))
+        markup.row(pbutton('Central de Prêmios', 'admin_premios', 'box'))
+        markup.row(pbutton('Consultar Vendas', 'menu_vendas', 'chart'),
+                   pbutton('Gerenciar Backups', 'menu_backups', 'box'))
+        markup.row(pbutton('Configurar Player API', 'config_player_api', 'globe'))
+        markup.row(pbutton(maintenance_label, 'toggle_manutencao_painel', 'alert'))
+        markup.row(pbutton('Transmitir a Todos', 'configurar_usuarios', 'alert'))
+        markup.row(pbutton('Voltar', 'voltar_menu', 'back'))
 
         if message.text != '/admin':
             bot.edit_message_text(
@@ -2337,19 +2355,22 @@ def notificar_abastecimento_estoque(abastecidos):
         for produto, quantidade in abastecidos.items():
             estoque_atual = api.ControleLogins.pegar_estoque(produto)
             linhas.append(
-                f'🟢 <b>{html.escape(str(produto))}</b> — '
+                f'{custom_emoji(MENU_PREMIUM_EMOJI_IDS["estoque"], "📦")} '
+                f'<b>{html.escape(str(produto))}</b> — '
                 f'+{int(quantidade)} unidade(s) | '
                 f'<b>total: {int(estoque_atual)}</b>'
             )
 
         texto = (
-            '📦 <b>ESTOQUE REABASTECIDO!</b>\n\n'
-            '✅ Novos produtos já estão disponíveis na loja:\n\n'
+            f'{custom_emoji(MENU_PREMIUM_EMOJI_IDS["estoque"], "📦")} <b>ESTOQUE REABASTECIDO!</b>\n\n'
+            f'{custom_emoji(MENU_PREMIUM_EMOJI_IDS["premios"], "✅")} Novos produtos já estão disponíveis na loja:\n\n'
             + '\n'.join(linhas)
-            + '\n\n🛒 <i>Acesse a loja e garanta o seu!</i>'
+            + f'\n\n{custom_emoji(MENU_PREMIUM_EMOJI_IDS["carrinho"], "🛒")} <i>Acesse a loja e garanta o seu!</i>'
         )
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton(botao_personalizado('abrir_loja', '🛒 ABRIR LOJA'), url=MINIAPP_URL))
+        botao_loja = InlineKeyboardButton('ABRIR LOJA', url=MINIAPP_URL)
+        botao_loja.icon_custom_emoji_id = MENU_PREMIUM_EMOJI_IDS["carrinho"]
+        markup.row(botao_loja)
         bot.send_message(
             get_sales_notification_chat_id(),
             texto,
@@ -5878,10 +5899,18 @@ def gerar_menu_principal(user_id=None):
     bt_carrinho = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('carrinho', 'CARRINHO'), callback_data='ver_carrinho'), 'carrinho')
     bt_pesquisar = set_menu_premium_icon(InlineKeyboardButton(botao_personalizado('pesquisar_logins', 'PESQUISAR LOGINS'), switch_inline_query_current_chat=''), 'pesquisar')
     bt_roleta = InlineKeyboardButton('🎰 ROLETA DA SORTE', callback_data='roleta_sorte')
+    bt_contas_globais = set_menu_premium_icon(
+        InlineKeyboardButton(
+            'CONTAS GLOBAIS',
+            callback_data='contas_globais_menu'
+        ),
+        'globe'
+    )
 
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(bt_miniapp)
     markup.add(bt_comprar)
+    markup.add(bt_contas_globais)
     markup.add(bt_addsaldo)
     markup.row(bt_perfil, bt_suporte)
     markup.add(bt_jogos)
@@ -5974,23 +6003,23 @@ def gerar_menu_grupos():
 def markup_inatividade_cliente(terms_callback='termos_inatividade', user_id=None):
     markup = InlineKeyboardMarkup()
     markup.row(
-        InlineKeyboardButton('[cor:azul] 🛍️ ABRIR LOJA', web_app=types.WebAppInfo(url=miniapp_url_for_user(user_id))),
-        InlineKeyboardButton('[cor:verde] 💳 ADICIONAR SALDO', callback_data='addsaldo')
+        set_menu_premium_icon(InlineKeyboardButton('[cor:azul] ABRIR LOJA', web_app=types.WebAppInfo(url=miniapp_url_for_user(user_id))), 'carrinho'),
+        set_menu_premium_icon(InlineKeyboardButton('[cor:verde] ADICIONAR SALDO', callback_data='addsaldo'), 'pix')
     )
     markup.row(
-        InlineKeyboardButton('🎧 FALAR COM SUPORTE', url=api.CredentialsChange.SuporteInfo.link_suporte()),
-        InlineKeyboardButton('📜 VER TERMOS', callback_data=terms_callback)
+        set_menu_premium_icon(InlineKeyboardButton('FALAR COM SUPORTE', url=api.CredentialsChange.SuporteInfo.link_suporte()), 'suporte'),
+        set_menu_premium_icon(InlineKeyboardButton('VER TERMOS', callback_data=terms_callback), 'termos')
     )
     return markup
 
 def texto_inatividade_cliente():
     return (
-        "💎 <b>UMA EXPERIÊNCIA PREMIUM ESPERA POR VOCÊ</b>\n\n"
+        f"{custom_emoji(MENU_PREMIUM_EMOJI_IDS['premios'], '💎')} <b>UMA EXPERIÊNCIA PREMIUM ESPERA POR VOCÊ</b>\n\n"
         "Seu acesso à <b>Ramon Store</b> já está liberado. Escolha seu produto, "
         "adicione saldo e receba tudo automaticamente pelo bot.\n\n"
-        "⚡ <b>Entrega rápida</b>\n"
-        "🔐 <b>Compra protegida</b>\n"
-        "🎧 <b>Suporte disponível</b>\n\n"
+        f"{custom_emoji(MENU_PREMIUM_EMOJI_IDS['cashback'], '⚡')} <b>Entrega rápida</b>\n"
+        f"{custom_emoji(MENU_PREMIUM_EMOJI_IDS['termos'], '🔐')} <b>Compra protegida</b>\n"
+        f"{custom_emoji(MENU_PREMIUM_EMOJI_IDS['suporte'], '🎧')} <b>Suporte disponível</b>\n\n"
         "<i>Novidades e ofertas exclusivas: /alertas</i>"
     )
 
@@ -7291,10 +7320,11 @@ def handle_start(message):
             if api.CredentialsChange.id_dono() != int(message.from_user.id):
                 bot.reply_to(message, "â€¢ O bot estÃ© em manutenÃ§Ã£o, voltaremos em breve!")
                 return
-        bot.reply_to(message, "â€¢ O bot estÃ¡ em manutenÃ§Ã£o, mas vocÃª foi identificado como administrador!")
+        bot.reply_to(message, "• O bot está em manutenção, mas você foi identificado como administrador!")
 
-    if not ensure_reserve_access(message.from_user.id, message.chat.id):
-        return
+    # VERIFICAÇÃO DE GRUPO RESERVA - COMENTADO
+    # if not ensure_reserve_access(message.from_user.id, message.chat.id):
+    #     return
 
     start_payload = ''
     if message.text:
@@ -8865,6 +8895,14 @@ def inline_search_logins(inline_query):
         results.append(result)
         count_id += 1
 
+    # Inclui também o catálogo global do Player na mesma busca inline.
+    try:
+        from player_handlers import build_inline_search_results
+        results.extend(build_inline_search_results(types, termo))
+    except Exception as error:
+        print(f"[PLAYER] Erro na busca inline: {error}")
+    results = results[:50]  # Limite aceito pela API de InlineQuery.
+
     if not results:
         result_none = types.InlineQueryResultArticle(
             id='99999',
@@ -9066,7 +9104,14 @@ def callback_cancelar_inline(call):
   
 
 
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(
+    func=lambda call: bool(call.data) and not (
+        call.data == 'contas_globais_menu'
+        or call.data == 'player_search'
+        or call.data == 'noop'
+        or call.data.startswith(('contas_globais_page:', 'player_cat:', 'player_prod:', 'player_buy:'))
+    )
+)
 def callback_query(call):
 
     if call.data == 'dup_login_add':
@@ -9100,21 +9145,23 @@ def callback_query(call):
         return
 
     if call.data == 'reserve_verified_continue':
-        try:
-            if not is_user_in_reserve_group(call.from_user.id):
-                bot.answer_callback_query(call.id, "Entre no grupo ou canal reserva antes de continuar. Se solicitou entrada, aguarde a aprovação.", show_alert=True)
-                return
-        except Exception as error:
-            chat_ref = reserve_group_username() or reserve_group_id()
-            print(f"[RESERVA] Falha ao verificar usuario {call.from_user.id} no chat {chat_ref}: {error}", flush=True)
-            bot.answer_callback_query(
-                call.id,
-                "Não foi possível consultar o grupo/canal. Tente novamente; se persistir, avise o suporte para conferir o destino e as permissões do bot.",
-                show_alert=True,
-            )
-            return
+        # VERIFICAÇÃO DE GRUPO RESERVA - COMENTADO
+        # try:
+        #     if not is_user_in_reserve_group(call.from_user.id):
+        #         bot.answer_callback_query(call.id, "Entre no grupo ou canal reserva antes de continuar. Se solicitou entrada, aguarde a aprovação.", show_alert=True)
+        #         return
+        # except Exception as error:
+        #     chat_ref = reserve_group_username() or reserve_group_id()
+        #     print(f"[RESERVA] Falha ao verificar usuario {call.from_user.id} no chat {chat_ref}: {error}", flush=True)
+        #     bot.answer_callback_query(
+        #         call.id,
+        #         "Não foi possível consultar o grupo/canal. Tente novamente; se persistir, avise o suporte para conferir o destino e as permissões do bot.",
+        #         show_alert=True,
+        #     )
+        #     return
+        
         mark_reserve_verified(call.from_user.id)
-        bot.answer_callback_query(call.id, "VerificaÃ§Ã£o confirmada.", show_alert=True)
+        bot.answer_callback_query(call.id, "Verificação confirmada.", show_alert=True)
         try:
             bot.edit_message_text(
                 chat_id=call.message.chat.id,
@@ -10655,20 +10702,186 @@ def callback_query(call):
             if api.CredentialsChange.id_dono() != int(call.message.chat.id):
                 bot.answer_callback_query(call.id, "O bot esta em manutenÃ§Ã£o, voltaremos em breve!", show_alert=True)
                 return
-        bot.answer_callback_query(call.id, "O bot estÃ© em manutenÃ§Ã£o, mas vocÃ© foi identificado como administrador!", show_alert=True)
+        # A alternância de manutenção responde ao callback mais abaixo com o
+        # novo estado. Responder aqui também faria o Telegram rejeitar a
+        # segunda resposta e a alteração não seria concluída.
+        if call.data not in ('manutencao', 'toggle_manutencao_painel'):
+            bot.answer_callback_query(call.id, "O bot estÃ© em manutenÃ§Ã£o, mas vocÃ© foi identificado como administrador!", show_alert=True)
 
     if api.Admin.verificar_vencimento() == True:
         ver_se_expirou()
         return
 
-    if call.data != 'reserve_verified_continue' and not is_owner_or_admin(call.from_user.id):
-        if not ensure_reserve_access(call.from_user.id, call.message.chat.id):
-            bot.answer_callback_query(call.id, "Entre no grupo reserva para continuar.", show_alert=True)
-            return
+    # VERIFICAÇÃO DE GRUPO RESERVA EM CALLBACKS - COMENTADO
+    # if call.data != 'reserve_verified_continue' and not is_owner_or_admin(call.from_user.id):
+    #     if not ensure_reserve_access(call.from_user.id, call.message.chat.id):
+    #         bot.answer_callback_query(call.id, "Entre no grupo reserva para continuar.", show_alert=True)
+    #         return
 
     # =============== Voltar painel adm
     if call.data == 'voltar_paineladm':
         painel_admin(call.message)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # HANDLERS DE CONFIGURAÇÃO DA API PLAYER (PAINEL ADMIN)
+    # ═══════════════════════════════════════════════════════════════════════
+    
+    if call.data == 'config_player_api':
+        """Menu de configuração da API Player"""
+        import player_api
+        
+        if not (api.Admin.verificar_admin(call.from_user.id) or int(call.from_user.id) == int(api.CredentialsChange.id_dono())):
+            bot.answer_callback_query(call.id, "Sem permissão", show_alert=True)
+            return
+        
+        bot.answer_callback_query(call.id)
+        
+        config = player_api.load_player_config()
+        api_key = config.get('api_key', '')
+        enabled = config.get('enabled', False)
+        markup_percentage = player_api.get_markup_percentage()
+        
+        status_emoji = "✅" if enabled else "❌"
+        status_text = "ATIVADA" if enabled else "DESATIVADA"
+        
+        texto = (
+            "🌍 <b>CONFIGURAÇÃO - PLAYER API</b>\n\n"
+            f"Status: {status_emoji} <b>{status_text}</b>\n"
+            f"Comissão sobre o preço: <b>{markup_percentage:.2f}%</b>\n\n"
+        )
+        
+        if api_key:
+            masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+            texto += f"🔑 API Key: <code>{masked_key}</code>\n\n"
+            
+            # Testa a conexão
+            success, message = player_api.test_api_connection()
+            if success:
+                texto += f"✅ <b>Conexão OK:</b> {message}\n\n"
+                
+                # Mostra saldo se disponível
+                balance = player_api.get_balance()
+                if balance is not None:
+                    texto += f"💰 Saldo Player: R$ {balance:.2f}\n\n"
+            else:
+                texto += f"❌ <b>Erro:</b> {message}\n\n"
+        else:
+            texto += "⚠️ <b>API Key não configurada</b>\n\n"
+        
+        texto += (
+            "📖 <b>Como configurar:</b>\n"
+            "1. Crie sua conta em playertv.sbs\n"
+            "2. Gere seu token de API no painel\n"
+            "3. Cole o token aqui usando o botão abaixo\n\n"
+            "🔗 Documentação: https://playertv.sbs/api/v1/docs"
+        )
+        
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('🔑 Configurar API Key', callback_data='player_set_key'))
+        markup.add(InlineKeyboardButton('💹 Definir comissão (%)', callback_data='player_set_markup'))
+        
+        if api_key:
+            toggle_text = "❌ Desativar" if enabled else "✅ Ativar"
+            markup.add(InlineKeyboardButton(toggle_text, callback_data='player_toggle'))
+            markup.add(InlineKeyboardButton('🔄 Testar Conexão', callback_data='player_test'))
+        
+        markup.add(InlineKeyboardButton('🔙 Voltar ao Painel', callback_data='voltar_paineladm'))
+        
+        try:
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=texto,
+                parse_mode='HTML',
+                reply_markup=markup,
+                disable_web_page_preview=True
+            )
+        except:
+            bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup, disable_web_page_preview=True)
+
+    if call.data == 'player_set_key':
+        """Solicita a API Key do Player"""
+        if not (api.Admin.verificar_admin(call.from_user.id) or int(call.from_user.id) == int(api.CredentialsChange.id_dono())):
+            bot.answer_callback_query(call.id, "Sem permissão", show_alert=True)
+            return
+        
+        bot.answer_callback_query(call.id)
+        
+        texto = (
+            "🔑 <b>CONFIGURAR API KEY - PLAYER</b>\n\n"
+            "Envie o token de API que você gerou no painel do Player.\n\n"
+            "📌 O token é uma string alfanumérica longa.\n"
+            "📌 Exemplo: eyJhbGciOiJIUzI1NiIsInR5cCI...\n\n"
+            "⚠️ <b>Atenção:</b> Mantenha seu token seguro!\n\n"
+            "Digite /cancelar para voltar."
+        )
+        
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton('❌ Cancelar', callback_data='config_player_api'))
+        
+        try:
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=texto,
+                parse_mode='HTML',
+                reply_markup=markup
+            )
+        except:
+            bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+        
+        # Marca que está aguardando a API Key
+        pending_player_api_key[call.from_user.id] = True
+
+    if call.data == 'player_set_markup':
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão', show_alert=True)
+            return
+        pending_player_markup[call.from_user.id] = True
+        bot.answer_callback_query(call.id)
+        bot.send_message(
+            call.message.chat.id,
+            'Envie a porcentagem de comissão. Exemplo: <code>20</code> cobra 20% acima do preço base. Use <code>0</code> para desativar.',
+            parse_mode='HTML'
+        )
+
+    if call.data == 'player_toggle':
+        """Alterna o status da integração Player"""
+        import player_api
+        
+        if not (api.Admin.verificar_admin(call.from_user.id) or int(call.from_user.id) == int(api.CredentialsChange.id_dono())):
+            bot.answer_callback_query(call.id, "Sem permissão", show_alert=True)
+            return
+        
+        enabled = player_api.toggle_player_status()
+        status_text = "ativada" if enabled else "desativada"
+        
+        bot.answer_callback_query(call.id, f"✅ Integração Player {status_text}!", show_alert=True)
+        
+        # Atualiza o menu chamando recursivamente
+        call.data = 'config_player_api'
+
+    if call.data == 'player_test':
+        """Testa a conexão com a API Player"""
+        import player_api
+        
+        if not (api.Admin.verificar_admin(call.from_user.id) or int(call.from_user.id) == int(api.CredentialsChange.id_dono())):
+            bot.answer_callback_query(call.id, "Sem permissão", show_alert=True)
+            return
+        
+        success, message = player_api.test_api_connection()
+        
+        if success:
+            bot.answer_callback_query(call.id, f"✅ {message}", show_alert=True)
+        else:
+            bot.answer_callback_query(call.id, f"❌ {message}", show_alert=True)
+        
+        # Atualiza o menu
+        call.data = 'config_player_api'
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # FIM DOS HANDLERS DE CONFIGURAÇÃO DA API PLAYER
+    # ═══════════════════════════════════════════════════════════════════════
 
     # =============== Menu inicial
     if call.data == 'perfil':
@@ -10792,10 +11005,19 @@ def callback_query(call):
             return
         testar_api_estoque(call)
         return
-    if call.data == 'manutencao':
+    if call.data in ('manutencao', 'toggle_manutencao_painel'):
+        if not is_owner_or_admin(call.from_user.id):
+            bot.answer_callback_query(call.id, 'Sem permissão.', show_alert=True)
+            return
         api.CredentialsChange.mudar_status_manutencao()
-        bot.answer_callback_query(call.id, "Status de manutenÃ§Ã£o atualizado com sucesso!", show_alert=True)
-        configuracoes_geral(call.message)
+        active = api.CredentialsChange.status_manutencao()
+        status = 'ativada' if active else 'desativada'
+        bot.answer_callback_query(call.id, f'Manutenção {status} com sucesso!', show_alert=True)
+        if call.data == 'toggle_manutencao_painel':
+            painel_admin(call.message)
+        else:
+            configuracoes_geral(call.message)
+        return
     if call.data == 'configurar_modo_exibicao':
         configurar_modo_exibicao(call.message)
     if call.data == 'set_modo_categorizado':
@@ -11904,7 +12126,16 @@ if _uses_central_stock:
 else:
     threading.Thread(target=iniciar_sync_acessos, daemon=True).start()
 
-print("? Bot iniciado e pronto para receber mensagens!")
+print("[BOT] Bot iniciado e pronto para receber mensagens!")
+
+# Registra handlers do Player API
+try:
+    import player_handlers
+    player_handlers.registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get_sales_notification_chat_id)
+    print("[PLAYER] Handlers de Contas Globais registrados")
+except Exception as e:
+    print(f"[PLAYER] Erro ao registrar handlers: {e}")
+
 # ---- Site e painel (vendasdoramon.squareweb.app): sobe junto com o bot. Se falhar, o bot segue normal.
 try:
     import site_ponte
@@ -11912,5 +12143,77 @@ try:
 except Exception as _e_site:
     print(f"[SITE] nao iniciou: {_e_site}")
 
-bot.infinity_polling()
+@bot.message_handler(func=lambda message: message.from_user.id in pending_player_api_key and not message.text.startswith('/'))
+def handler_player_api_key(message):
+    """Handler para processar API Key do Player"""
+    import player_api
+    
+    user_id = message.from_user.id
+    pending_player_api_key.pop(user_id)
+    
+    # DELETAR a mensagem com a API key por segurança
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except:
+        pass
+    
+    api_key = message.text.strip()
+    
+    if len(api_key) < 10:
+        bot.send_message(message.chat.id, "❌ API Key muito curta! Digite uma key válida.")
+        return
+    
+    # Salva a API Key e habilita a integração. A função lança exceção caso o
+    # arquivo não possa ser gravado, para não informar sucesso indevidamente.
+    try:
+        player_api.save_player_config(api_key, enabled=True)
+        success = True
+    except Exception as error:
+        print(f"[PLAYER] Erro ao salvar API Key: {error}")
+        success = False
 
+    if success:
+        # Testar a conexão
+        test_success, test_message = player_api.test_api_connection()
+        
+        if test_success:
+            texto = f"✅ <b>API KEY CONFIGURADA COM SUCESSO!</b>\n\n"
+            texto += f"• Conexão testada e funcionando\n"
+            texto += f"• {test_message}\n\n"
+            texto += "A integração Player está pronta para uso!"
+        else:
+            texto = f"⚠️ <b>API KEY SALVA MAS COM AVISO</b>\n\n"
+            texto += f"• Key salva com sucesso\n"
+            texto += f"• Teste de conexão: {test_message}\n\n"
+            texto += "Verifique se a key está correta."
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton('🔙 Voltar ao Painel', callback_data='config_player_api'))
+        
+        bot.send_message(message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+    else:
+        bot.send_message(message.chat.id, "❌ Erro ao salvar API Key. Tente novamente.")
+
+
+@bot.message_handler(func=lambda message: message.from_user.id in pending_player_markup and not message.text.startswith('/'))
+def handler_player_markup(message):
+    user_id = message.from_user.id
+    pending_player_markup.pop(user_id, None)
+    try:
+        value = float(message.text.strip().replace(',', '.').replace('%', ''))
+        if not 0 <= value <= 500:
+            raise ValueError
+    except (TypeError, ValueError):
+        bot.reply_to(message, 'Informe uma porcentagem entre 0 e 500. Tente novamente pelo painel.')
+        return
+    import player_api
+    value = player_api.set_markup_percentage(value)
+    bot.send_message(
+        message.chat.id,
+        f'Comissão definida em <b>{value:.2f}%</b>. Os preços das Contas Globais já foram atualizados.',
+        parse_mode='HTML',
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Voltar à API Player', callback_data='config_player_api')]])
+    )
+
+
+bot.infinity_polling()

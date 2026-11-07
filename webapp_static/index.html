@@ -464,6 +464,7 @@ nav button.on span.nv .avt{box-shadow:0 0 0 2px var(--or)}
   <button class="cat on" data-c="todos">🛍️ Todos</button>
   <button class="cat" data-c="conta">🛒 Contas</button>
   <button class="cat" data-c="tela">📲 Telas</button>
+  <button class="cat" data-c="global">🌐 Contas Globais</button>
   <button class="cat" data-c="oferta">⚡ Ofertas</button>
   <button class="cat" data-c="fav">❤️ Favoritos</button>
 </div>
@@ -880,7 +881,7 @@ function visiveis() {
     (cat === 'todos' || (cat === 'oferta' ? p.promo : cat === 'fav' ? favs.has(p.nome) : p.categoria === cat)))
     .sort((a, b) => (b.promo - a.promo) || (favs.has(b.nome) - favs.has(a.nome)) || a.nome.localeCompare(b.nome, 'pt'));
 }
-const TITULOS = {todos:'Todos os serviços', conta:'Contas', tela:'Telas', oferta:'Ofertas Relâmpago', fav:'Seus favoritos'};
+const TITULOS = {todos:'Todos os serviços', conta:'Contas', tela:'Telas', global:'Contas Globais', oferta:'Ofertas Relâmpago', fav:'Seus favoritos'};
 function render() {
   const g = $('grid'), lista = visiveis();
   $('secT').textContent = TITULOS[cat]; $('secN').textContent = lista.length + (lista.length === 1 ? ' serviço' : ' serviços');
@@ -920,7 +921,7 @@ function detalhe(p) {
   const pr = el('div', {class:'pr', style:'font-size:28px;margin:4px 0 2px'}, brl(p.preco)); if (p.promo) pr.append(el('s', {style:'font-size:14px'}, brl(p.valor)));
   const q = carrinho[p.nome] || 0;
   b.append(ph, el('h2', {}, nm),
-    el('div', {class:'tags'}, el('span', {class:'tag'}, p.categoria === 'tela' ? '📲 Tela' : '🛒 Conta'), el('span', {class:'tag'}, '📅 ' + p.duracao + ' dias'),
+    el('div', {class:'tags'}, el('span', {class:'tag'}, p.categoria === 'global' ? '🌐 ' + p.subcategoria : p.categoria === 'tela' ? '📲 Tela' : '🛒 Conta'), el('span', {class:'tag'}, p.categoria === 'global' ? '📋 Validade conforme descrição' : '📅 ' + p.duracao + ' dias'),
       el('span', {class:'tag'}, '📦 ' + p.estoque + ' em estoque'), el('span', {class:'tag'}, '⚡ Entrega imediata')),
     pr, el('p', {}, p.descricao || (ehSite ? 'Entrega automática logo após o pagamento, direto aqui no site.' : 'Entrega automática logo após o pagamento, direto aqui e no chat do bot.')),
     el('div', {class:'brow'},
@@ -957,7 +958,8 @@ function confirmarCompra(p) {
       el('button', {onclick: () => { if (qtd < p.estoque) { qtd++; hap(); pintar(); } else toast('Estoque máximo atingido.', 'err'); }}, '+'));
     box.replaceChildren(
       el('h3', {}, '🛒 Confirmar compra'), el('div', {class:'sub'}, 'Você realmente deseja comprar este serviço?'),
-      el('div', {class:'prod'}, foto(p, 'th', '24px'), el('div', {class:'tx'}, el('b', {}, nm), el('small', {}, (p.categoria === 'tela' ? 'Tela' : 'Conta') + ' · ' + p.duracao + ' dias')), step),
+      el('div', {class:'prod'}, foto(p, 'th', '24px'), el('div', {class:'tx'}, el('b', {}, nm), el('small', {}, p.categoria === 'global' ? 'Conta Global · Consulte a descrição' : (p.categoria === 'tela' ? 'Tela' : 'Conta') + ' · ' + p.duracao + ' dias')), step),
+      p.categoria === 'global' ? el('p', {}, p.descricao || 'Confira a validade e as condições do produto antes de comprar.') : '',
       linha('Valor unitário', brl(p.preco)), linha('Quantidade', String(qtd)),
       linha('Seu saldo', brl(saldo)),
       linha('Saldo após a compra', el('span', {class: ok ? '' : 'neg'}, ok ? brl(saldo - total) : 'Faltam ' + brl(falta))),
@@ -1034,7 +1036,7 @@ function credenciais(nome, valor, email, senha, desc) {
   const link = /^https?:\/\//i.test(email || '') && (!senha || senha === '-' || senha === 'None');
   const linha = (rot, v) => el('div', {class:'r'}, el('span', {}, rot), el('code', {}, String(v)), el('button', {class:'cpy', onclick:() => copiar(v)}, 'Copiar'));
   return el('div', {class:'ent'}, el('h4', {}, nome + (valor ? ' · ' + brl(valor) : '')),
-    link ? linha('Link', email) : linha('Email', email), link ? '' : linha('Senha', senha),
+    link ? linha('Link', email) : linha('Acesso', email), link ? '' : linha('Senha', senha),
     desc && desc !== '-' && desc !== 'None' ? el('p', {}, desc) : '');
 }
 function mostrarResultado(r) {

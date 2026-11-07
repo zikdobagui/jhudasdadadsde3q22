@@ -1557,6 +1557,52 @@ def _oferta(nome):
         return None
 
 
+def _catalogo_global():
+    """Catálogo Player para o site; nunca expõe a chave da integração."""
+    import player_api
+    import player_categories
+    if not player_api.is_player_enabled():
+        return []
+    saida = []
+    for categoria, produtos in player_categories.group_products(player_api.get_products() or []).items():
+        for produto in produtos:
+            estoque = max(0, int(produto.get('stock') or 0))
+            if not estoque or not produto.get('id'):
+                continue
+            nome = '🌐 ' + str(produto.get('name') or 'Conta Global')
+            preco = player_api.get_sale_price(produto.get('price', 0))
+            if preco <= 0:
+                continue
+            saida.append({'nome': nome, 'preco': preco, 'valor': preco,
+                          'estoque': estoque, 'descricao': player_api.product_description(produto),
+                          'duracao': 0, 'img': _img_url(produto.get('name') or nome),
+                          'categoria': 'global', 'subcategoria': categoria, 'promo': False,
+                          'player_id': str(produto['id'])})
+    return saida
+
+
+def _reservar_global(g, uid):
+    import player_api
+    pedido = player_api.create_order(g['player_id'], quantity=1, user_telegram_id=uid)
+    if not isinstance(pedido, dict) or pedido.get('success') is False:
+        return None
+    dados = pedido.get('data', pedido)
+    if not isinstance(dados, dict):
+        return None
+    credenciais = dados.get('credentials') or {}
+    if not isinstance(credenciais, dict):
+        credenciais = {'acesso': credenciais}
+    acesso = '\n'.join(f'{k}: {v}' for k, v in credenciais.items()
+                       if k not in ('password', 'senha') and v is not None)
+    senha = str(credenciais.get('password') or credenciais.get('senha') or '')
+    descricao = g['descricao']
+    if dados.get('id'):
+        descricao += '\nPedido: ' + str(dados['id'])
+    if not acesso and not senha:
+        acesso = 'Pedido recebido. Consulte o suporte com o número do pedido.'
+    return (g['nome'], g['preco'], acesso, senha, descricao, 0)
+
+
 def _catalogo():
     """Um item por serviço: preço do 1º login do estoque (igual ao bot), com oferta relâmpago."""
     # Quando o administrador conectou a API central, ela passa a ser a fonte de
@@ -1569,7 +1615,7 @@ def _catalogo():
             p['categoria'] = 'tela' if 'tela' in p['nome'].lower() else 'conta'
             p['promo'] = False
         remoto.sort(key=lambda x: x['nome'].lower())
-        return remoto
+        return remoto + _catalogo_global()
     grupos = {}
     custom = _nomes_com_foto_customizada()
     for a in G['api'].ControleLogins.pegar_servicos():
@@ -1600,7 +1646,7 @@ def _catalogo():
         g['promo'] = preco < g['valor']
         saida.append(g)
     saida.sort(key=lambda x: x['nome'].lower())
-    return saida
+    return saida + _catalogo_global()
 
 
 def _loja(u):
@@ -1665,32 +1711,36 @@ def _comprar(u, itens):
                 if not _debitar(u.id, g['preco']):
                     aviso = 'Saldo insuficiente para concluir. Parte do pedido foi entregue.'
                     break
-                try:
-                    import integracao_estoque as ie
-                    venda_id = f'web-{u.id}-{int(time.time() * 1000)}-{secrets.token_hex(4)}'
-                    acesso_remoto = ie.reservar(g['nome'], u.id, venda_id)
-                    res = (acesso_remoto.get('nome', g['nome']), acesso_remoto.get('valor', g['preco']),
-                           acesso_remoto.get('email', ''), acesso_remoto.get('senha', ''),
-                           acesso_remoto.get('descricao', ''), acesso_remoto.get('duracao', 30))
-                except ie.ErroIntegracao as e:
-                    # Se a integração não estiver ligada, preserva o funcionamento atual.
-                    if ie.estado()['conectada']:
-                        api.InfoUser.add_saldo(u.id, g['preco'])
-                        aviso = e.msg
-                        break
-                    res = api.ControleLogins.pegar_primeiro_disponivel(g['nome'])
+                if g.get('player_id'):
+                    res = _reservar_global(g, u.id)
+                else:
+                    try:
+                        import integracao_estoque as ie
+                        venda_id = f'web-{u.id}-{int(time.time() * 1000)}-{secrets.token_hex(4)}'
+                        acesso_remoto = ie.reservar(g['nome'], u.id, venda_id)
+                        res = (acesso_remoto.get('nome', g['nome']), acesso_remoto.get('valor', g['preco']),
+                               acesso_remoto.get('email', ''), acesso_remoto.get('senha', ''),
+                               acesso_remoto.get('descricao', ''), acesso_remoto.get('duracao', 30))
+                    except ie.ErroIntegracao as e:
+                        # Se a integração não estiver ligada, preserva o funcionamento atual.
+                        if ie.estado()['conectada']:
+                            api.InfoUser.add_saldo(u.id, g['preco'])
+                            aviso = e.msg
+                            break
+                        res = api.ControleLogins.pegar_primeiro_disponivel(g['nome'])
                 if not res:
                     api.InfoUser.add_saldo(u.id, g['preco'])  # estorna
                     aviso = f'{g["nome"]} esgotou durante a compra. O valor foi devolvido ao saldo.'
                     break
                 nome, _v, email, senha, desc, dur = res
+                duracao = int(dur or 0) if g.get('player_id') else int(dur or 30)
                 try:
                     # Mesma entrega do bot: mensagem no chat, histórico, aviso de venda, etc.
-                    G['entregar'](msg, nome, g['preco'], email, senha, desc or '', dur or 30)
+                    G['entregar'](msg, nome, g['preco'], email, senha, desc or '', duracao)
                 except Exception:
                     print(f'[WEBAPP] erro em entregar() uid={u.id}:\n{traceback.format_exc()}')
                 entregues.append({'nome': nome, 'email': email, 'senha': senha,
-                                  'descricao': str(desc or ''), 'duracao': int(dur or 30), 'valor': g['preco']})
+                                  'descricao': str(desc or ''), 'duracao': duracao, 'valor': g['preco']})
             if aviso:
                 break
         if entregues:

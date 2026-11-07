@@ -34,3 +34,7 @@ bot_pai/runtime/
 qrcode*.png
 webapp_cache/
 webapp_avatars/
+
+# Chave privada da API Player e backups locais
+settings/player_config.json
+*.bak2

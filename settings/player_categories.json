@@ -1,0 +1,28 @@
+{
+    "overrides": {
+        "microsoft": "Microsoft / Office",
+        "microsfot": "Microsoft / Office",
+        "autodesk": "Design / Produtividade",
+        "gemini ai pro + youtube premium": "Música"
+    },
+    "order": [
+        "YouTube Premium",
+        "Spotify",
+        "ChatGPT",
+        "Prime Video",
+        "Gemini",
+        "Crunchyroll",
+        "CapCut",
+        "Claude",
+        "Office 365",
+        "Canva",
+        "Apple TV",
+        "ElevenLabs"
+    ],
+    "hidden_categories": [],
+    "sources": [
+        "global"
+    ],
+    "exclude_sources": [],
+    "group_by": "name"
+}
