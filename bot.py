@@ -7322,9 +7322,9 @@ def handle_start(message):
                 return
         bot.reply_to(message, "• O bot está em manutenção, mas você foi identificado como administrador!")
 
-    # VERIFICAÇÃO DE GRUPO RESERVA - COMENTADO
-    # if not ensure_reserve_access(message.from_user.id, message.chat.id):
-    #     return
+    # VERIFICAÇÃO DE GRUPO RESERVA
+    if not ensure_reserve_access(message.from_user.id, message.chat.id):
+        return
 
     start_payload = ''
     if message.text:
@@ -7335,29 +7335,29 @@ def handle_start(message):
         if importar_carrinho_miniapp_start(message, start_payload):
             return
 
-    # VERIFICAÃ‡ÃƒO DE PARTICIPAÃ‡ÃƒO OBRIGATÃ“RIA NO GRUPO/CANAL - COMENTADO
-    # try:
-    #     member_info = bot.get_chat_member(REQUIRED_GROUP_ID, message.from_user.id)
-    #     if getattr(member_info, 'status', 'left') in ['left', 'kicked']:
-    #         markup = InlineKeyboardMarkup().add(
-    #             InlineKeyboardButton("ðŸ‘¥ Entrar no Grupo", url=JOIN_GROUP_LINK)
-    #         )
-    #         bot.send_message(
-    #             message.chat.id,
-    #             "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
-    #             reply_markup=markup
-    #         )
-    #         return
-    # except ApiTelegramException:
-    #     markup = InlineKeyboardMarkup().add(
-    #         InlineKeyboardButton("ðŸ‘¥ Entrar no Grupo", url=JOIN_GROUP_LINK)
-    #     )
-    #     bot.send_message(
-    #         message.chat.id,
-    #         "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
-    #         reply_markup=markup
-    #     )
-    #     return
+    # VERIFICAÃ‡ÃƒO DE PARTICIPAÃ‡ÃƒO OBRIGATÃ“RIA NO GRUPO/CANAL
+    try:
+        member_info = bot.get_chat_member(REQUIRED_GROUP_ID, message.from_user.id)
+        if getattr(member_info, 'status', 'left') in ['left', 'kicked']:
+            markup = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("👥 Entrar no Grupo", url=JOIN_GROUP_LINK)
+            )
+            bot.send_message(
+                message.chat.id,
+                "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
+                reply_markup=markup
+            )
+            return
+    except ApiTelegramException:
+        markup = InlineKeyboardMarkup().add(
+            InlineKeyboardButton("👥 Entrar no Grupo", url=JOIN_GROUP_LINK)
+        )
+        bot.send_message(
+            message.chat.id,
+            "âš ï¸ VocÃª precisa participar do nosso grupo para usar o bot.\n\nEntre no grupo abaixo e depois envie /start novamente!",
+            reply_markup=markup
+        )
+        return
 
     texto = decorate_start_text(message)
 
@@ -9145,20 +9145,20 @@ def callback_query(call):
         return
 
     if call.data == 'reserve_verified_continue':
-        # VERIFICAÇÃO DE GRUPO RESERVA - COMENTADO
-        # try:
-        #     if not is_user_in_reserve_group(call.from_user.id):
-        #         bot.answer_callback_query(call.id, "Entre no grupo ou canal reserva antes de continuar. Se solicitou entrada, aguarde a aprovação.", show_alert=True)
-        #         return
-        # except Exception as error:
-        #     chat_ref = reserve_group_username() or reserve_group_id()
-        #     print(f"[RESERVA] Falha ao verificar usuario {call.from_user.id} no chat {chat_ref}: {error}", flush=True)
-        #     bot.answer_callback_query(
-        #         call.id,
-        #         "Não foi possível consultar o grupo/canal. Tente novamente; se persistir, avise o suporte para conferir o destino e as permissões do bot.",
-        #         show_alert=True,
-        #     )
-        #     return
+        # VERIFICAÇÃO DE GRUPO RESERVA
+        try:
+            if not is_user_in_reserve_group(call.from_user.id):
+                bot.answer_callback_query(call.id, "Entre no grupo ou canal reserva antes de continuar. Se solicitou entrada, aguarde a aprovação.", show_alert=True)
+                return
+        except Exception as error:
+            chat_ref = reserve_group_username() or reserve_group_id()
+            print(f"[RESERVA] Falha ao verificar usuario {call.from_user.id} no chat {chat_ref}: {error}", flush=True)
+            bot.answer_callback_query(
+                call.id,
+                "Não foi possível consultar o grupo/canal. Tente novamente; se persistir, avise o suporte para conferir o destino e as permissões do bot.",
+                show_alert=True,
+            )
+            return
         
         mark_reserve_verified(call.from_user.id)
         bot.answer_callback_query(call.id, "Verificação confirmada.", show_alert=True)
@@ -10712,11 +10712,11 @@ def callback_query(call):
         ver_se_expirou()
         return
 
-    # VERIFICAÇÃO DE GRUPO RESERVA EM CALLBACKS - COMENTADO
-    # if call.data != 'reserve_verified_continue' and not is_owner_or_admin(call.from_user.id):
-    #     if not ensure_reserve_access(call.from_user.id, call.message.chat.id):
-    #         bot.answer_callback_query(call.id, "Entre no grupo reserva para continuar.", show_alert=True)
-    #         return
+    # VERIFICAÇÃO DE GRUPO RESERVA EM CALLBACKS
+    if call.data != 'reserve_verified_continue' and not is_owner_or_admin(call.from_user.id):
+        if not ensure_reserve_access(call.from_user.id, call.message.chat.id):
+            bot.answer_callback_query(call.id, "Entre no grupo reserva para continuar.", show_alert=True)
+            return
 
     # =============== Voltar painel adm
     if call.data == 'voltar_paineladm':
