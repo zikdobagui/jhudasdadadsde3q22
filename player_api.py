@@ -7,6 +7,7 @@ import requests
 import json
 import os
 import time
+import uuid
 from typing import Optional, Dict, List, Any
 
 PLAYER_CONFIG_FILE = 'settings/player_config.json'
@@ -227,33 +228,61 @@ def create_order(product_id: str, quantity: int = 1, user_telegram_id: Optional[
     Returns:
         Dados do pedido ou None em caso de erro
     """
+    # Não repetir automaticamente o POST: um timeout pode ocorrer após a cobrança.
+    external_id = f"telegram-{user_telegram_id or 'web'}-{uuid.uuid4().hex}"
     try:
         if not is_player_enabled():
+            print("[PLAYER API] Compra bloqueada: integração desativada ou chave ausente", flush=True)
             return None
-        
-        payload = {
-            'product_id': product_id,
-            'quantity': quantity
-        }
-        
-        if user_telegram_id:
-            payload['customer_id'] = str(user_telegram_id)
-        
+
         response = requests.post(
-            f'{PLAYER_API_BASE_URL}/orders',
+            f'{PLAYER_API_BASE_URL}/purchase',
             headers=get_headers(),
-            json=payload,
-            timeout=15
+            json={'product_id': product_id, 'quantity': quantity,
+                  'external_order_id': external_id},
+            timeout=30
         )
-        
-        if response.status_code in [200, 201]:
-            return response.json()
-        
+        if response.status_code not in (200, 201):
+            reasons = {401: 'chave inválida', 402: 'saldo do revendedor insuficiente',
+                       404: 'produto inexistente', 409: 'sem estoque',
+                       422: 'entrega manual indisponível', 429: 'limite de requisições',
+                       503: 'fornecedor indisponível'}
+            reason = reasons.get(response.status_code, 'requisição rejeitada')
+            print(f"[PLAYER API] POST /purchase HTTP {response.status_code}: {reason}; referência={external_id}", flush=True)
+            return None
+        result = response.json()
+        if not isinstance(result, dict) or result.get('success') is False:
+            print(f"[PLAYER API] POST /purchase retornou falha; referência={external_id}", flush=True)
+            return None
+        order = result.get('data', result)
+        if not isinstance(order, dict):
+            print(f"[PLAYER API] Resposta de compra inválida; referência={external_id}", flush=True)
+            return None
+        order_id = order.get('order_id') or order.get('id')
+        if not order_id:
+            print(f"[PLAYER API] Compra sem número de pedido; referência={external_id}", flush=True)
+            return None
+        order = {**order, 'id': order_id, 'external_order_id': external_id}
+        print(f"[PLAYER API] Compra aceita; referência={external_id}; pedido={order_id}", flush=True)
+        # Depois da confirmação, uma falha no download não desfaz a compra.
+        # Preserve o pedido para registrar a cobrança e permitir recuperação.
+        if not order.get('credentials') and order.get('status') != 'awaiting_delivery':
+            try:
+                delivery = requests.get(
+                    f'{PLAYER_API_BASE_URL}/orders/{order_id}/download',
+                    headers=get_headers(), timeout=20
+                )
+                if delivery.status_code == 200 and delivery.text.strip():
+                    order['credentials'] = {'acesso': delivery.text.strip()}
+                else:
+                    print(f"[PLAYER API] Download da entrega HTTP {delivery.status_code}; pedido={order_id}", flush=True)
+            except Exception as error:
+                print(f"[PLAYER API] Falha no download ({type(error).__name__}); pedido={order_id}", flush=True)
+        return order
+    except Exception as error:
+        print(f"[PLAYER API] Falha na compra ({type(error).__name__}); referência={external_id}. Confira o histórico antes de repetir.", flush=True)
         return None
-        
-    except Exception as e:
-        print(f"[PLAYER API] Erro ao criar pedido: {e}")
-        return None
+
 
 def get_order_status(order_id: str) -> Optional[Dict]:
     """
