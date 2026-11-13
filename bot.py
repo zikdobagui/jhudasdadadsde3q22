@@ -7536,7 +7536,8 @@ def ler_texto_e_gif(nome_arquivo):
 def safe_edit_message(message, new_content, reply_markup=None):
  
     try:
-        if getattr(message, 'caption', None) is not None:
+        if (getattr(message, 'content_type', 'text') != 'text'
+                or getattr(message, 'caption', None) is not None):
             bot.edit_message_caption(
                 chat_id=message.chat.id,
                 message_id=message.message_id,
@@ -7805,13 +7806,7 @@ def servicos(message):
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.menu_comprar(message)
-    bot.edit_message_text(
-        chat_id=message.chat.id,
-        message_id=message.message_id,
-        text=texto,
-        parse_mode='HTML',
-        reply_markup=markup
-    )
+    safe_edit_message(message, texto, reply_markup=markup)
 
 def exibir_servico(message, servico):
     texto, email = api.Textos.exibir_servico(message, servico)
