@@ -531,17 +531,35 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
     @bot.callback_query_handler(func=lambda c: c.data.startswith('player_buy:'))
     def comprar_produto_player(call):
         """Processa a compra de um produto Player"""
-        bot.answer_callback_query(call.id)
+        # Compras pela busca inline não têm call.message; entrega no privado.
+        chat_id = call.message.chat.id if call.message else call.from_user.id
+
+        def mostrar(texto, markup=None):
+            if call.message:
+                try:
+                    bot.edit_message_text(
+                        chat_id=chat_id, message_id=call.message.message_id,
+                        text=texto, parse_mode='HTML', reply_markup=markup
+                    )
+                    return
+                except Exception:
+                    pass
+            bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
+
+        try:
+            bot.answer_callback_query(call.id, "Processando compra...")
+        except Exception:
+            pass
         
         product_id = call.data.replace('player_buy:', '')
         product = player_api.get_product_details(product_id)
         
         if not product:
-            bot.answer_callback_query(call.id, "Produto não encontrado", show_alert=True)
+            mostrar("Produto indisponível no momento. Volte ao catálogo e tente novamente.")
             return
         
         price = player_api.get_sale_price(product.get('price', 0))
-        user_balance = database.get_user_balance(call.from_user.id)
+        user_balance = api.InfoUser.saldo(call.from_user.id)
         
         # Emojis premium
         money = custom_emoji(PLAYER_PREMIUM_EMOJIS['money'], '💰')
@@ -550,7 +568,7 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
         if user_balance < price:
             texto = (
                 f"{money} <b>Saldo Insuficiente</b>\n\n"
-                f"Produto: {product.get('name', 'Produto')}\n"
+                f"Produto: {html.escape(str(product.get('name', 'Produto')))}\n"
                 f"Preço: R$ {price:.2f}\n"
                 f"Seu saldo: R$ {user_balance:.2f}\n"
                 f"Faltam: R$ {price - user_balance:.2f}\n\n"
@@ -567,27 +585,25 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
             back_btn.icon_custom_emoji_id = PLAYER_PREMIUM_EMOJIS['back']
             markup.add(back_btn)
             
-            try:
-                bot.edit_message_text(
-                    chat_id=call.message.chat.id,
-                    message_id=call.message.message_id,
-                    text=texto,
-                    parse_mode='HTML',
-                    reply_markup=markup
-                )
-            except:
-                bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+            mostrar(texto, markup)
             return
         
         # Cria o pedido na API Player
         order = player_api.create_order(product_id, quantity=1, user_telegram_id=call.from_user.id)
         
-        if not order:
-            bot.answer_callback_query(call.id, "Erro ao processar pedido", show_alert=True)
+        if not isinstance(order, dict) or order.get('success') is False:
+            mostrar("Não foi possível concluir a compra com o fornecedor. Seu saldo não foi descontado. Tente novamente mais tarde ou fale com o suporte.")
             return
+        order = order.get('data', order)
+        if not isinstance(order, dict) or not order:
+            mostrar("O fornecedor retornou um pedido inválido. Seu saldo não foi descontado. Entre em contato com o suporte.")
+            return
+        credentials = order.get('credentials') or {}
+        if not isinstance(credentials, dict):
+            credentials = {'acesso': credentials}
         
         # Desconta o saldo do usuário
-        database.add_saldo(call.from_user.id, -price)
+        api.InfoUser.tirar_saldo(call.from_user.id, price)
         
         # Registra a compra
         user_data = database.load_user_data(call.from_user.id)
@@ -599,11 +615,12 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
         
         compra_data = {
             'servico': product.get('name', 'Conta Global'),
-            'email': order.get('credentials', {}).get('email', 'N/A'),
-            'senha': order.get('credentials', {}).get('password', 'N/A'),
+            'email': credentials.get('email', credentials.get('login', 'N/A')),
+            'senha': credentials.get('password', credentials.get('senha', 'N/A')),
             'preco': price,
             'data': datetime.datetime.now().isoformat(),
             'order_id': order.get('id', ''),
+            'credentials': credentials,
             'tipo': 'player_global'
         }
         
@@ -624,21 +641,21 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
         support = custom_emoji(PLAYER_PREMIUM_EMOJIS['warning'], '⚠️')
         
         # Monta mensagem de sucesso
-        credentials = order.get('credentials', {})
         texto = (
             f"{check} <b>Compra Realizada com Sucesso!</b>\n\n"
-            f"{globe} Produto: {display_name(product.get('name', 'Conta Global'))}\n"
+            f"{globe} Produto: {html.escape(display_name(product.get('name', 'Conta Global')))}\n"
             f"{money} Valor: R$ {price:.2f}\n\n"
             f"{email_emoji} <b>Dados de Acesso:</b>\n"
         )
         
-        if credentials.get('email'):
-            texto += f"Email: <code>{credentials['email']}</code>\n"
-        if credentials.get('password'):
-            texto += f"{lock} Senha: <code>{credentials['password']}</code>\n"
-        if credentials.get('profile'):
-            texto += f"Perfil: <code>{credentials['profile']}</code>\n"
-        
+        for label, value in credentials.items():
+            if value is not None:
+                texto += f"{html.escape(str(label))}: <code>{html.escape(str(value))}</code>\n"
+        if order.get('id'):
+            texto += f"Pedido: <code>{html.escape(str(order['id']))}</code>\n"
+        if not credentials:
+            texto += "Pedido recebido pelo fornecedor. Consulte o suporte com o número do pedido.\n"
+
         texto += f"\n{money} Saldo restante: R$ {user_balance - price:.2f}\n\n"
         texto += f"{support} Precisa de ajuda? Entre em contato com o suporte!"
         
@@ -652,16 +669,7 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
         home_btn.icon_custom_emoji_id = PLAYER_PREMIUM_EMOJIS['home']
         markup.add(home_btn)
         
-        try:
-            bot.edit_message_text(
-                chat_id=call.message.chat.id,
-                message_id=call.message.message_id,
-                text=texto,
-                parse_mode='HTML',
-                reply_markup=markup
-            )
-        except:
-            bot.send_message(call.message.chat.id, texto, parse_mode='HTML', reply_markup=markup)
+        mostrar(texto, markup)
         
         # Notifica no grupo de vendas
         try:
@@ -671,7 +679,7 @@ def registrar_handlers(bot, api, cancelar_followup, _build_personal_mention, get
             notif_texto = (
                 f"{globe} <b>VENDA - CONTA GLOBAL</b>\n\n"
                 f"{customer} Cliente: {_build_personal_mention(call.from_user.id)}\n"
-                f"{package} Produto: {display_name(product.get('name', 'Conta Global'))}\n"
+                f"{package} Produto: {html.escape(display_name(product.get('name', 'Conta Global')))}\n"
                 f"{money} Valor: R$ {price:.2f}\n"
                 f"{date} Data: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
             )
