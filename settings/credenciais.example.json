@@ -43,5 +43,7 @@
       "client_id": "",
       "client_secret": ""
     }
-  }
+  },
+    "whatsapp_api_key": "",
+    "whatsapp_catalog_api_key": ""
 }
