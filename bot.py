@@ -7375,6 +7375,15 @@ def perfil(call):
     bt3 = InlineKeyboardButton(f'{api.Botoes.voltar()}', callback_data='menu_start')
     markup.add(bt3)
     texto = api.Textos.perfil(user)
+    import whatsapp_api
+    vinculo = whatsapp_api.profile_code(user.id)
+    if vinculo['vinculado']:
+        texto += '\n\n📱 WhatsApp vinculado ao seu cadastro.'
+    else:
+        texto += ('\n\n📱 <b>Vincular ao WhatsApp</b>\n'
+                  f"Código: <code>{vinculo['codigo']}</code>\n"
+                  'Envie este código somente ao nosso bot oficial do WhatsApp. '
+                  'Válido por 24 horas e para um único vínculo.')
 
     try:
         fotos = bot.get_user_profile_photos(user.id, limit=1)

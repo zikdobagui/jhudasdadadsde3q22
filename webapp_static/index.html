@@ -1184,6 +1184,12 @@ function desenharPerfil() {
     tile('🛍️', '#ffb02026', String(d.total_compras), 'Compras', 0), tile('💸', '#12c48b26', brl(d.total_gasto), 'Total gasto', 1),
     tile('💰', '#8b5cf626', String(d.total_pagos), 'Recargas', 2), tile('❤️', '#ff3d6e26', String(favs.size), 'Favoritos', 3));
   const nos = [hero, id, wal, stats];
+  if (d.vinculo_whatsapp) {
+    const v = d.vinculo_whatsapp;
+    nos.push(el('div', {class: 'pcard'}, el('b', {}, '📱 Vínculo com WhatsApp'),
+      el('p', {}, v.vinculado ? 'WhatsApp vinculado ao seu cadastro.' : 'Envie este código somente ao nosso bot oficial do WhatsApp. Válido por 24 horas e para um único vínculo.'),
+      v.codigo ? el('code', {style: 'overflow-wrap:anywhere;user-select:all'}, v.codigo) : ''));
+  }
   if (d.vip) {
     const v = d.vip, pc = v.proximo ? Math.max(4, Math.min(100, v.gasto / v.proximo.gasto_minimo * 100)) : 100;
     nos.push(el('div', {class: 'pcard'},

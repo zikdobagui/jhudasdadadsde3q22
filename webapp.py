@@ -1436,6 +1436,7 @@ def _soma(lista, chave='valor'):
 
 
 def _perfil(u):
+    import whatsapp_api
     api, db = G['api'], G['database']
     d = db.load_user_data(u.id) or {}
     p = _prefs(u.id)
@@ -1461,6 +1462,7 @@ def _perfil(u):
     zap = re.sub(r'\D', '', str(p.get('whatsapp') or d.get('whatsapp') or ''))
     return {'id': u.id, 'nome': _nome_exib(u, p), 'username': u.username, 'email': getattr(u, 'email', None),
             'site': site, 'bio': p.get('bio') or '', 'whatsapp': zap,
+            'vinculo_whatsapp': whatsapp_api.profile_code(u.id),
             'avatar': _avatar_pub(p), 'banner': int(p.get('banner') or 0), 'acento': int(p.get('acento') or 0),
             'membro_desde': desde,
             'saldo': round(float(api.InfoUser.saldo(u.id)), 2),
@@ -1842,6 +1844,9 @@ class _H(BaseHTTPRequestHandler):
         self.wfile.write(corpo)
 
     def do_GET(self):
+        import whatsapp_api
+        if whatsapp_api.handle(self, _catalogo):
+            return
         p = self.path.split('?')[0]
         if _rota_antiga_get(p):
             return _api_antiga.Handler.do_GET(self)
@@ -1894,6 +1899,9 @@ class _H(BaseHTTPRequestHandler):
         return self._resp(404, {'erro': 'não encontrado'})
 
     def do_POST(self):
+        import whatsapp_api
+        if whatsapp_api.handle(self, _catalogo):
+            return
         if _api_antiga is not None and self.path.split('?')[0] in _ROTAS_ANTIGAS_POST:
             return _api_antiga.Handler.do_POST(self)
         try:
