@@ -54,7 +54,11 @@ def phone(value):
     return value
 
 
-def dispatch(method, path, body, catalog):
+def dispatch(method, path, body, catalog, services=None):
+    import whatsapp_transactions
+    transaction = whatsapp_transactions.dispatch(__import__(__name__), method, path, body, services)
+    if transaction is not None:
+        return transaction
     if path == '/api/whatsapp/v1/vincular' and method == 'POST':
         number = phone(body.get('whatsapp'))
         code = str(body.get('codigo', '')).strip().upper()
@@ -92,7 +96,7 @@ def dispatch(method, path, body, catalog):
     raise APIError(404, 'rota nao encontrada')
 
 
-def handle(handler, catalog):
+def handle(handler, catalog, services=None):
     path = urlparse(handler.path).path
     if not path.startswith('/api/whatsapp/'):
         return False
@@ -119,7 +123,7 @@ def handle(handler, catalog):
                     raise ValueError()
             except (ValueError, json.JSONDecodeError):
                 raise APIError(400, 'corpo JSON invalido ou maior que 4096 bytes')
-        result = dispatch(handler.command, path, body, catalog)
+        result = dispatch(handler.command, path, body, catalog, services)
     except APIError as exc:
         status, result = exc.status, {'erro': exc.message}
     except Exception:

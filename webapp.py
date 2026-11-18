@@ -1845,7 +1845,7 @@ class _H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         import whatsapp_api
-        if whatsapp_api.handle(self, _catalogo):
+        if whatsapp_api.handle(self, _catalogo, {'comprar': _comprar, 'pix': _gerar_pix, 'status_pix': _status_pix}):
             return
         p = self.path.split('?')[0]
         if _rota_antiga_get(p):
@@ -1900,7 +1900,7 @@ class _H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         import whatsapp_api
-        if whatsapp_api.handle(self, _catalogo):
+        if whatsapp_api.handle(self, _catalogo, {'comprar': _comprar, 'pix': _gerar_pix, 'status_pix': _status_pix}):
             return
         if _api_antiga is not None and self.path.split('?')[0] in _ROTAS_ANTIGAS_POST:
             return _api_antiga.Handler.do_POST(self)

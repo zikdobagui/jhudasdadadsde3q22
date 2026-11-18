@@ -120,7 +120,32 @@ const historico = await telegramApi(`/api/whatsapp/v1/clientes/${numero}/histori
 const produtos = await telegramApi('/api/whatsapp/v1/produtos', { catalogo: true });
 ```
 
-Este contrato permite vínculo e leitura. Não debita saldo, efetua compras,
-recarrega, entrega credenciais ou desfaz vínculos. Essas operações exigem
-endpoints transacionais próprios antes de serem oferecidas pelo WhatsApp.
+O contrato original de leitura foi ampliado pelos endpoints transacionais abaixo. O vínculo não transfere nem soma saldos locais do WhatsApp. Não há operação de desfazer vínculo nesta API.
 Nunca registrar chaves ou códigos de vínculo em logs ou enviá-los ao frontend.
+
+
+## Saldo compartilhado — endpoints transacionais
+
+### Arquivos para publicar no Telegram
+
+Enviar juntos `webapp.py`, `whatsapp_api.py` e `whatsapp_transactions.py` para
+a aplicação Telegram na Square Cloud. O módulo de transações é obrigatório;
+enviar somente os dois arquivos antigos deixa a integração incompleta.
+Preservar o `settings/credenciais.json` do servidor com as duas chaves configuradas
+e o banco `database/whatsapp_links.sqlite3` com os vínculos e operações existentes.
+Reiniciar a aplicação Telegram após publicar. Commit e push não configuram as
+chaves privadas do servidor. Os testes locais usam dados simulados e não comprovam
+que a aplicação publicada foi atualizada nem que o gateway PIX está disponível.
+
+Instale `whatsapp_transactions.py` junto das versões atualizadas de `whatsapp_api.py` e `webapp.py`. Reinicie o serviço. Todas as rotas abaixo exigem `Authorization: Bearer <WHATSAPP_API_KEY>`; a chave de catálogo não as autoriza.
+
+- POST `/api/whatsapp/v1/clientes/NUMERO/comprar`: JSON `{"operacao":"HASH_SHA256","produto":"Nome","preco":19.9}`. Executa uma unidade pelo checkout existente do site, no mesmo cadastro Telegram. O servidor revalida preço, estoque e saldo. A resposta de sucesso contém `resultado.entregues` com as credenciais da compra e `resultado.saldo`.
+- POST `/api/whatsapp/v1/clientes/NUMERO/pix`: JSON `{"operacao":"HASH_SHA256","valor":10}`. Usa o gateway e verificador existentes do Telegram; a aprovação credita o cadastro central. A resposta contém `resultado.id_pag`, `copia`, `valor`, `total` e `qr`.
+- GET `/api/whatsapp/v1/clientes/NUMERO/operacoes/HASH_SHA256`: recupera estado e resultado, apenas para o titular vinculado.
+- GET `/api/whatsapp/v1/clientes/NUMERO/pix/ID/status`: consulta `pago` e `saldo` de pagamento criado pela API para o titular vinculado.
+
+Respostas transacionais: `operacao`, `status` e, quando concluído, `resultado`. Estados: DONE, PROCESSING, REVIEW, REJECTED. REJECTED pode incluir `erro_status` (ex.: 402 saldo insuficiente). O cliente deve avaliar o estado, mesmo em HTTP 200.
+
+O ID de 64 caracteres hexadecimais identifica a intenção de compra/recarga e deve permanecer igual ao recuperar uma resposta perdida. O backend persiste a operação antes de executar efeitos externos e devolve o resultado anterior para o mesmo ID e conteúdo. ID reutilizado com dados diferentes é recusado. Operações pendentes bloqueiam novas operações do mesmo tipo para esse usuário. PROCESSING após queda e REVIEW exigem conferência administrativa; não cobrar, estornar nem repetir automaticamente. Os endpoints não aceitam crédito arbitrário de saldo pelo WhatsApp.
+
+Os resultados de operações, inclusive entrega, ficam no mesmo `database/whatsapp_links.sqlite3`. Proteja o arquivo e mantenha-o nos backups. Não exporte os resultados aos logs ou a outros clientes.
