@@ -3317,7 +3317,7 @@ def mostrar_central_premios(message_or_call):
     markup.row(InlineKeyboardButton(botao_personalizado("premios_voltar", botoes["voltar"]), callback_data='menu_start'))
     texto = config["textos"]["menu"]
     if message_id:
-        bot.edit_message_text(texto, chat_id=chat_id, message_id=message_id, parse_mode='HTML', reply_markup=markup)
+        safe_edit_message(message_or_call.message, texto, reply_markup=markup)
     else:
         bot.send_message(chat_id, texto, parse_mode='HTML', reply_markup=markup)
 
@@ -3333,7 +3333,7 @@ def mostrar_caixas_premios(call):
         markup.row(InlineKeyboardButton(f"🎁 {nome} (R$ {valor:.2f})", callback_data=f"premios_abrir_caixa|{index}"))
     markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
     texto = config["textos"]["caixas"].replace("{caixas}", "\n".join(linhas) if linhas else "Nenhuma caixa ativa no momento.")
-    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+    safe_edit_message(call.message, texto, reply_markup=markup)
 
 def mostrar_bonus_premios(call):
     config = carregar_config_premios()
@@ -3342,7 +3342,7 @@ def mostrar_bonus_premios(call):
     markup.row(InlineKeyboardButton('🛒 Comprar para completar', callback_data='servicos'))
     markup.row(InlineKeyboardButton('💳 Recarregar saldo', callback_data='addsaldo'))
     markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
-    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+    safe_edit_message(call.message, texto, reply_markup=markup)
 
 def mostrar_promocoes_premios(call):
     config = carregar_config_premios()
@@ -3357,7 +3357,7 @@ def mostrar_promocoes_premios(call):
     else:
         texto += "\n\nNenhuma promoção ativa no momento."
     markup.row(InlineKeyboardButton('↩️ Voltar', callback_data='central_premios'))
-    bot.edit_message_text(texto, chat_id=call.message.chat.id, message_id=call.message.message_id, parse_mode='HTML', reply_markup=markup)
+    safe_edit_message(call.message, texto, reply_markup=markup)
 
 def entregar_premio_servico(call, servico, valor_cobrado, origem):
     user_id = call.from_user.id
@@ -3373,7 +3373,7 @@ def entregar_premio_servico(call, servico, valor_cobrado, origem):
         return
     nome, _valor_original, email, senha, descricao, duracao = resultado
     api.InfoUser.tirar_saldo(user_id, valor_cobrado)
-    api.InfoUser.add_compras(user_id, nome, valor_cobrado, email, senha)
+    api.InfoUser.add_compra(user_id, nome, valor_cobrado, email, senha, duracao=duracao)
     aplicar_cashback_vip(user_id, valor_cobrado)
     texto = (
         f"🎁 <b>{html.escape(origem)}</b>\n\n"
