@@ -4702,7 +4702,7 @@ def adicionar_login(message):
         bot.reply_to(message, "â€¢ VocÃª nÃ£o tem permissÃ£o para usar este comando!")
         return
 
-    sep = message.text.strip().split('\n')
+    sep = (message.text or '').strip().splitlines()
     separador = api.CredentialsChange.separador()
     quantity = 0
     notificacoes = {} 
@@ -4755,7 +4755,11 @@ def adicionar_login(message):
                     bot.reply_to(message, "Erro ao adicionar, vocÃ© enviou em um formato nÃ£o permitido!")
             else:
                 try:
-                    sp = ordem.split(f'{separador}')
+                    sp = ordem.split(separador)
+                    if len(sp) != 6 and separador != '/':
+                        sp = ordem.split('/')
+                    if len(sp) != 6:
+                        raise ValueError('Cada linha deve conter os seis campos do login.')
                     servico = sp[0].strip()
                     valor_texto = sp[1].strip()
                     descricao = sp[2].strip()
@@ -11096,7 +11100,14 @@ def callback_query(call):
         separador = api.CredentialsChange.separador()
         bot.send_message(
             call.message.chat.id,
-            f"Envie os acessos que deseja adicionar, no formato:\nNOME{separador}VALOR{separador}DESCRICAO{separador}EMAIL{separador}SENHA{separador}DURACAO",
+            (
+                f"Envie os acessos que deseja adicionar, um por linha, no formato:\n"
+                f"NOME{separador}VALOR{separador}DESCRICAO{separador}EMAIL{separador}SENHA{separador}DURACAO\n\n"
+                "Também aceito o formato com /:\n"
+                "NOME/VALOR/DESCRICAO/EMAIL/SENHA/DURACAO\n\n"
+                "Cole a lista inteira em uma mensagem. Cada linha será um acesso. "
+                "Informe a duração em dias (exemplo: 30)."
+            ),
             parse_mode='HTML',
             reply_markup=types.ForceReply()
         )
